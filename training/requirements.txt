@@ -1,0 +1,34 @@
+# LLaMA-Omni Training Requirements
+
+# Core ML frameworks
+torch>=2.0.0
+torchvision>=0.15.0
+torchaudio>=2.0.0
+
+# Transformers and related
+transformers>=4.30.0
+tokenizers>=0.13.0
+datasets>=2.14.0
+accelerate>=0.20.0
+
+# Audio processing
+librosa>=0.10.0
+soundfile>=0.12.0
+
+# Fairseq for HuBERT and speech processing
+fairseq>=0.12.0
+
+# Training utilities
+tqdm>=4.64.0
+wandb>=0.15.0  # Optional, for experiment tracking
+tensorboard>=2.13.0  # Optional, alternative logging
+
+# Data processing
+numpy>=1.24.0
+scipy>=1.10.0
+scikit-learn>=1.3.0  # For K-means
+joblib>=1.3.0  # For loading K-means models
+
+# Utilities
+packaging>=23.0
+requests>=2.31.0
