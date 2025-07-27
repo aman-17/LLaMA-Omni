@@ -39,10 +39,6 @@ class TrainingConfig:
         default=None,
         metadata={"help": "Path to validation dataset"}
     )
-    resume_from_checkpoint: str = field(
-        default=None,
-        metadata={"help": "Path to checkpoint to resume training from"}
-    )
 
 
 def setup_logging():
@@ -136,11 +132,29 @@ def main():
     config_path = os.path.join(training_args.output_dir, "training_config.json")
     with open(config_path, 'w') as f:
         import json
+        from dataclasses import asdict
+        
+        def make_serializable(obj):
+            """Convert object to JSON serializable format"""
+            if hasattr(obj, '__dict__'):
+                return {k: make_serializable(v) for k, v in obj.__dict__.items() 
+                       if not k.startswith('_') and not callable(v)}
+            elif isinstance(obj, (list, tuple)):
+                return [make_serializable(item) for item in obj]
+            elif isinstance(obj, dict):
+                return {k: make_serializable(v) for k, v in obj.items()}
+            else:
+                try:
+                    json.dumps(obj)  # Test if serializable
+                    return obj
+                except TypeError:
+                    return str(obj)  # Convert to string if not serializable
+        
         config_dict = {
-            'training_config': training_config.__dict__,
-            'model_args': model_args.__dict__,
-            'data_args': data_args.__dict__,
-            'training_args': training_args.__dict__
+            'training_config': make_serializable(training_config),
+            'model_args': make_serializable(model_args),
+            'data_args': make_serializable(data_args),
+            'training_args': make_serializable(training_args)
         }
         json.dump(config_dict, f, indent=2)
     
@@ -153,7 +167,7 @@ def main():
                 model_args=model_args,
                 data_args=data_args,
                 training_args=training_args,
-                model_path=training_config.resume_from_checkpoint
+                model_path=training_args.resume_from_checkpoint
             )
             
             # Train the model

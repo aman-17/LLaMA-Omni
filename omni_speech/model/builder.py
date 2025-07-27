@@ -23,7 +23,7 @@ from omni_speech.model import *
 from omni_speech.model.speech_encoder.builder import build_speech_encoder
 
 
-def load_pretrained_model(model_path, model_base, is_lora=False, s2s=False, load_8bit=False, load_4bit=False, device="cuda", use_flash_attn=False, **kwargs):
+def load_pretrained_model(model_path, model_base, is_lora=False, s2s=False, load_8bit=False, load_4bit=False, device="cuda", use_flash_attn=False, model_args=None, **kwargs):
     if load_8bit:
         kwargs['load_in_8bit'] = True
     elif load_4bit:
@@ -40,7 +40,8 @@ def load_pretrained_model(model_path, model_base, is_lora=False, s2s=False, load
     if use_flash_attn:
         kwargs['attn_implementation'] = 'flash_attention_2'
     
-    model_cls = OmniSpeech2SLlamaForCausalLM if s2s else OmniSpeechLlamaForCausalLM
+    # model_cls = OmniSpeech2SLlamaForCausalLM if s2s else OmniSpeechLlamaForCausalLM
+    model_cls = AutoModelForCausalLM
 
     # Load OmniSpeech model
     if is_lora:
@@ -83,6 +84,23 @@ def load_pretrained_model(model_path, model_base, is_lora=False, s2s=False, load
         )
         model = model.to(device=device)
 
+    # Add speech encoder configuration to model config if not present
+    if model_args:
+        if hasattr(model_args, 'speech_encoder') and model_args.speech_encoder:
+            model.config.speech_encoder = model_args.speech_encoder
+        elif not hasattr(model.config, 'speech_encoder'):
+            model.config.speech_encoder = "openai/whisper-large-v3"
+            
+        if hasattr(model_args, 'speech_encoder_type') and model_args.speech_encoder_type:
+            model.config.speech_encoder_type = model_args.speech_encoder_type
+        elif not hasattr(model.config, 'speech_encoder_type'):
+            model.config.speech_encoder_type = "whisper"
+    else:
+        if not hasattr(model.config, 'speech_encoder'):
+            model.config.speech_encoder = "openai/whisper-large-v3"
+        if not hasattr(model.config, 'speech_encoder_type'):
+            model.config.speech_encoder_type = "whisper"
+    
     model.get_model().speech_encoder = build_speech_encoder(model.config)
     model.get_model().speech_encoder.to(device=device, dtype=torch.float16)
 

@@ -2,3 +2,5 @@
 llama_omni.egg-info/
 models/
 vocoder/
+InstructS2S-200K/
+fairseq/

@@ -6,8 +6,8 @@
 set -e
 
 # Default configurations
-CONFIG_PATH=${1:-"configs/stage1_config.json"}
-DATA_PATH=${2:-"/path/to/InstructS2S-200K"}
+CONFIG_PATH=${1:-"/data/input/amanr/LLaMA-Omni/training/configs/stage1_config.json"}
+DATA_PATH=${2:-"/data/input/amanr/LLaMA-Omni/InstructS2S-200K/instruct_en_filtered.json"}
 OUTPUT_DIR=${3:-"./outputs/stage1"}
 
 echo "Starting LLaMA-Omni Stage 1 Training"
@@ -42,7 +42,7 @@ print(f'Updated config: {config_path}')
 "
 
 # Run training
-python train.py $CONFIG_PATH
+python training/train.py $CONFIG_PATH
 
 echo "Stage 1 training completed!"
 echo "Model saved to: $OUTPUT_DIR"
