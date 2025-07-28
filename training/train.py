@@ -1,9 +1,3 @@
-#!/usr/bin/env python3
-"""
-Main training script for LLaMA-Omni
-Supports both Stage 1 (speech-to-text) and Stage 2 (speech generation) training
-"""
-
 import argparse
 import os
 import sys
@@ -12,7 +6,6 @@ from dataclasses import dataclass, field
 from transformers import HfArgumentParser
 import logging
 
-# Add the parent directory to sys.path to import omni_speech modules
 sys.path.append(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
 from omni_speech.arguments import ModelArguments, DataArguments, TrainingArguments
@@ -22,7 +15,6 @@ from stage2_trainer import Stage2Trainer
 
 @dataclass
 class TrainingConfig:
-    """Training configuration for LLaMA-Omni"""
     stage: int = field(
         default=1,
         metadata={"help": "Training stage: 1 for speech-to-text, 2 for speech generation"}
@@ -42,7 +34,6 @@ class TrainingConfig:
 
 
 def setup_logging():
-    """Setup logging configuration"""
     logging.basicConfig(
         level=logging.INFO,
         format='%(asctime)s - %(name)s - %(levelname)s - %(message)s',
@@ -55,10 +46,8 @@ def setup_logging():
 
 def validate_arguments(training_config: TrainingConfig, model_args: ModelArguments, 
                       data_args: DataArguments, training_args: TrainingArguments):
-    """Validate training arguments"""
     if training_config.stage not in [1, 2]:
         raise ValueError("Stage must be 1 or 2")
-    
     if training_config.stage == 2:
         if not training_config.stage1_model_path:
             raise ValueError("Stage 1 model path is required for Stage 2 training")
@@ -77,33 +66,24 @@ def validate_arguments(training_config: TrainingConfig, model_args: ModelArgumen
 
 
 def main():
-    # Setup argument parser
     parser = HfArgumentParser((TrainingConfig, ModelArguments, DataArguments, TrainingArguments))
     
     if len(sys.argv) == 2 and sys.argv[1].endswith(".json"):
-        # If we pass only one argument to the script and it's the path to a json file,
-        # let's parse it to get our arguments.
         training_config, model_args, data_args, training_args = parser.parse_json_file(
             json_file=os.path.abspath(sys.argv[1])
         )
     else:
         training_config, model_args, data_args, training_args = parser.parse_args_into_dataclasses()
     
-    # Setup logging
     setup_logging()
     logger = logging.getLogger(__name__)
-    
-    # Add validation data path to data_args
     data_args.validation_data_path = training_config.validation_data_path
-    
-    # Validate arguments
     try:
         validate_arguments(training_config, model_args, data_args, training_args)
     except ValueError as e:
         logger.error(f"Argument validation failed: {e}")
         sys.exit(1)
-    
-    # Log training configuration
+
     logger.info("=" * 50)
     logger.info("LLaMA-Omni Training")
     logger.info("=" * 50)
@@ -116,7 +96,6 @@ def main():
     logger.info(f"Learning rate: {training_args.learning_rate}")
     logger.info("=" * 50)
     
-    # Set device
     if torch.cuda.is_available():
         device_count = torch.cuda.device_count()
         logger.info(f"Using {device_count} GPU(s)")
@@ -124,18 +103,14 @@ def main():
             logger.warning("Multi-GPU training not fully implemented. Using single GPU.")
     else:
         logger.info("Using CPU")
-    
-    # Create output directory
+
     os.makedirs(training_args.output_dir, exist_ok=True)
-    
-    # Save training configuration
     config_path = os.path.join(training_args.output_dir, "training_config.json")
     with open(config_path, 'w') as f:
         import json
         from dataclasses import asdict
         
         def make_serializable(obj):
-            """Convert object to JSON serializable format"""
             if hasattr(obj, '__dict__'):
                 return {k: make_serializable(v) for k, v in obj.__dict__.items() 
                        if not k.startswith('_') and not callable(v)}
@@ -160,7 +135,6 @@ def main():
     
     try:
         if training_config.stage == 1:
-            # Stage 1: Speech-to-Text Training
             logger.info("Starting Stage 1 training (Speech-to-Text)")
             
             trainer = Stage1Trainer(
@@ -170,12 +144,10 @@ def main():
                 model_path=training_args.resume_from_checkpoint
             )
             
-            # Train the model
             trained_model = trainer.train()
             logger.info("Stage 1 training completed successfully!")
             
         elif training_config.stage == 2:
-            # Stage 2: Speech Generation Training
             logger.info("Starting Stage 2 training (Speech Generation)")
             
             trainer = Stage2Trainer(
@@ -185,8 +157,7 @@ def main():
                 stage1_model_path=training_config.stage1_model_path,
                 kmeans_model_path=training_config.kmeans_model_path
             )
-            
-            # Train the model
+        
             trained_model = trainer.train()
             logger.info("Stage 2 training completed successfully!")
     

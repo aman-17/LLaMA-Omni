@@ -114,11 +114,35 @@ class InstructS2SDataset(Dataset):
                 y=audio, 
                 sr=sr, 
                 n_mels=self.data_args.mel_size,
-                n_fft=400,
-                hop_length=160
+                n_fft=1024,  # Whisper uses 1024
+                hop_length=160,  # 10ms hop length
+                fmin=0,
+                fmax=8000
             )
+            # Convert to log scale (dB)
+            mel = librosa.power_to_db(mel, ref=np.max)
+            # Normalize to [-1, 1] range as expected by Whisper
+            mel = (mel + 80) / 80
             mel = torch.from_numpy(mel).float()
-            return mel.transpose(0, 1)  # (time, mel_dim)
+            mel_transposed = mel.transpose(0, 1)  # (time, mel_dim)
+            
+            # Whisper expects fixed length sequences (3000 frames for 30-second audio)
+            target_length = 3000
+            current_length = mel_transposed.shape[0]
+            
+            if current_length > target_length:
+                # Truncate if too long
+                mel_transposed = mel_transposed[:target_length]
+            elif current_length < target_length:
+                # Pad if too short
+                padding = torch.zeros(target_length - current_length, mel_transposed.shape[1])
+                mel_transposed = torch.cat([mel_transposed, padding], dim=0)
+            
+            # print(f"DEBUG: Audio path: {audio_path}")
+            # print(f"DEBUG: Original mel shape: {mel.shape}")
+            # print(f"DEBUG: Final mel shape: {mel_transposed.shape}")
+            # print(f"DEBUG: Mel min/max: {mel_transposed.min():.3f}/{mel_transposed.max():.3f}")
+            return mel_transposed
         else:
             audio, sr = torchaudio.load(audio_path)
             if sr != 16000:
@@ -196,8 +220,9 @@ class DataCollator:
             return {}
         input_ids = [inst['input_ids'] for inst in instances]
         labels = [inst['labels'] for inst in instances]
+        pad_token_id = self.tokenizer.pad_token_id if self.tokenizer.pad_token_id is not None else self.tokenizer.eos_token_id
         input_ids = torch.nn.utils.rnn.pad_sequence(
-            input_ids, batch_first=True, padding_value=self.tokenizer.pad_token_id
+            input_ids, batch_first=True, padding_value=pad_token_id
         )
         labels = torch.nn.utils.rnn.pad_sequence(
             labels, batch_first=True, padding_value=IGNORE_INDEX
@@ -219,7 +244,7 @@ class DataCollator:
             'labels': labels,
             'speech_features': torch.stack(padded_speech),
             'speech_lengths': torch.tensor(speech_lengths),
-            'attention_mask': input_ids.ne(self.tokenizer.pad_token_id)
+            'attention_mask': input_ids.ne(pad_token_id)
         }
         if self.stage == 2:
             if 'speech_units' in instances[0]:

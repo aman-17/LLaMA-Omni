@@ -83,13 +83,44 @@ class OmniSpeechMetaForCausalLM(ABC):
         speech_encoder_type = self.config.speech_encoder_type
         speech_encoder = self.get_speech_encoder()
         if "whisper" in speech_encoder_type.lower():
-            encoder_outs = speech_encoder(speech.permute(0, 2, 1))
+            # print(f"DEBUG: Input speech shape: {speech.shape}")
+            # print(f"DEBUG: Input speech dtype: {speech.dtype}")
+            # print(f"DEBUG: Input speech_lengths: {speech_lengths}")
+            permuted_speech = speech.permute(0, 2, 1)
+            # print(f"DEBUG: Permuted speech shape: {permuted_speech.shape}")
+            # print(f"DEBUG: Speech encoder positional embedding shape: {speech_encoder.positional_embedding.shape}")
+            # print(f"DEBUG: Speech encoder positional embedding dtype: {speech_encoder.positional_embedding.dtype}")
+            
+            if permuted_speech.dtype != speech_encoder.positional_embedding.dtype:
+                print(f"DEBUG: Converting speech from {permuted_speech.dtype} to {speech_encoder.positional_embedding.dtype}")
+                permuted_speech = permuted_speech.to(speech_encoder.positional_embedding.dtype)
+            
+            encoder_outs = speech_encoder(permuted_speech)
+            # print(f"DEBUG: Encoder outputs shape: {encoder_outs.shape}")
+            # print(f"DEBUG: Encoder outputs device: {encoder_outs.device}")
+            # print(f"DEBUG: Encoder hidden size from outputs: {encoder_outs.shape[-1]}")
             speech_lengths = (speech_lengths + 1) // 2
         else:
             raise ValueError(f'Unknown speech encoder: {speech_encoder}')
         speech_projector_type = self.config.speech_projector_type
         speech_projector = self.get_speech_projector()
         if speech_projector_type == "linear":
+            projector_param = next(speech_projector.parameters())
+            # print(f"DEBUG: Speech projector device: {projector_param.device}")
+            # print(f"DEBUG: Speech projector dtype: {projector_param.dtype}")
+            # print(f"DEBUG: Speech projector linear1 weight shape: {speech_projector.linear1.weight.shape}")
+            # print(f"DEBUG: Encoder outputs dtype: {encoder_outs.dtype}")
+            # print(f"DEBUG: Encoder outputs final shape before projector: {encoder_outs.shape}")
+            
+            # Ensure encoder outputs are on the same device and dtype as the speech projector
+            if encoder_outs.device != projector_param.device:
+                print(f"DEBUG: Moving encoder outputs from {encoder_outs.device} to {projector_param.device}")
+                encoder_outs = encoder_outs.to(projector_param.device)
+            
+            if encoder_outs.dtype != projector_param.dtype:
+                print(f"DEBUG: Converting encoder outputs from {encoder_outs.dtype} to {projector_param.dtype}")
+                encoder_outs = encoder_outs.to(projector_param.dtype)
+            
             encoder_outs = speech_projector(encoder_outs)
             speech_lengths = speech_lengths // speech_projector.k
         else:
@@ -136,6 +167,9 @@ class OmniSpeechMetaForCausalLM(ABC):
             if num_speech == 0:
                 cur_speech_features = speech_features[cur_speech_idx]
                 cur_input_embeds_1 = self.get_model().embed_tokens(cur_input_ids)
+                # Ensure speech features match the dtype of text embeddings
+                if cur_speech_features.dtype != cur_input_embeds_1.dtype:
+                    cur_speech_features = cur_speech_features.to(cur_input_embeds_1.dtype)
                 cur_input_embeds = torch.cat([cur_input_embeds_1, cur_speech_features[0:0]], dim=0)
                 new_input_embeds.append(cur_input_embeds)
                 new_labels.append(labels[batch_idx])
@@ -161,6 +195,9 @@ class OmniSpeechMetaForCausalLM(ABC):
                 if i < num_speech:
                     cur_speech_features = speech_features[cur_speech_idx]
                     cur_speech_idx += 1
+                    # Ensure speech features match the dtype of text embeddings
+                    if cur_speech_features.dtype != cur_input_embeds.dtype:
+                        cur_speech_features = cur_speech_features.to(cur_input_embeds.dtype)
                     cur_new_input_embeds.append(cur_speech_features)
                     cur_new_labels.append(torch.full((cur_speech_features.shape[0],), IGNORE_INDEX, device=cur_labels.device, dtype=cur_labels.dtype))
 

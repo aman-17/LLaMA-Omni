@@ -1,8 +1,3 @@
-"""
-Stage 1 Training: Speech-to-Text Instruction Following
-Trains the speech adaptor and LLM while keeping speech encoder frozen
-"""
-
 import os
 import torch
 import torch.nn as nn

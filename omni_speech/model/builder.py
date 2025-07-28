@@ -41,7 +41,7 @@ def load_pretrained_model(model_path, model_base, is_lora=False, s2s=False, load
         kwargs['attn_implementation'] = 'flash_attention_2'
     
     # model_cls = OmniSpeech2SLlamaForCausalLM if s2s else OmniSpeechLlamaForCausalLM
-    model_cls = AutoModelForCausalLM
+    model_cls = OmniSpeechLlamaForCausalLM
 
     # Load OmniSpeech model
     if is_lora:

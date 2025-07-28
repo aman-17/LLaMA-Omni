@@ -1,8 +1,3 @@
-"""
-Stage 2 Training: Speech Generation with CTC
-Trains the speech decoder while keeping all other components frozen
-"""
-
 import os
 import torch
 import torch.nn as nn
@@ -20,8 +15,6 @@ from data_utils import create_data_loader
 
 
 class CTCLoss(nn.Module):
-    """CTC Loss for speech unit prediction"""
-    
     def __init__(self, blank_idx: int = 0, reduction: str = 'mean'):
         super().__init__()
         self.blank_idx = blank_idx
@@ -56,9 +49,7 @@ class CTCLoss(nn.Module):
         return self.ctc_loss(log_probs, targets_flat, input_lengths, target_lengths_clean)
 
 
-class Stage2Trainer:
-    """Trainer for Stage 2: Speech Generation with CTC"""
-    
+class Stage2Trainer:    
     def __init__(
         self,
         model_args: ModelArguments,
@@ -71,24 +62,12 @@ class Stage2Trainer:
         self.data_args = data_args
         self.training_args = training_args
         self.kmeans_model_path = kmeans_model_path
-        
-        # Setup logging
         logging.basicConfig(level=logging.INFO)
         self.logger = logging.getLogger(__name__)
-        
-        # Initialize model and tokenizer
         self.setup_model(stage1_model_path)
-        
-        # Setup CTC loss
         self.ctc_loss = CTCLoss(blank_idx=model_args.unit_vocab_size)  # Use vocab_size as blank
-        
-        # Setup data loaders
         self.setup_data_loaders()
-        
-        # Setup optimizer and scheduler
         self.setup_optimizer_and_scheduler()
-        
-        # Setup wandb if enabled
         if self.training_args.report_to == "wandb":
             wandb.init(
                 project="llama-omni-stage2",
@@ -100,8 +79,6 @@ class Stage2Trainer:
             )
     
     def setup_model(self, stage1_model_path: str):
-        """Initialize the model with Stage 1 weights"""
-        # Load the speech-to-speech model
         self.tokenizer, self.model, _ = load_pretrained_model(
             model_path=stage1_model_path,
             model_base=None,
@@ -120,11 +97,9 @@ class Stage2Trainer:
         self.logger.info(f"Model initialized. Trainable parameters: {self.count_trainable_params()}")
     
     def count_trainable_params(self) -> int:
-        """Count number of trainable parameters"""
         return sum(p.numel() for p in self.model.parameters() if p.requires_grad)
     
     def setup_data_loaders(self):
-        """Setup training and validation data loaders for Stage 2"""
         self.train_loader = create_data_loader(
             data_path=self.data_args.data_path,
             tokenizer=self.tokenizer,
@@ -136,7 +111,6 @@ class Stage2Trainer:
             shuffle=True
         )
         
-        # Setup validation loader if validation data is provided
         if hasattr(self.data_args, 'validation_data_path') and self.data_args.validation_data_path:
             self.val_loader = create_data_loader(
                 data_path=self.data_args.validation_data_path,
@@ -152,17 +126,14 @@ class Stage2Trainer:
             self.val_loader = None
     
     def setup_optimizer_and_scheduler(self):
-        """Setup optimizer and learning rate scheduler"""
         # Only optimize speech decoder parameters
         trainable_params = [p for p in self.model.parameters() if p.requires_grad]
         
         self.optimizer = AdamW(
             trainable_params,
-            lr=2e-4,  # Higher learning rate for stage 2 as mentioned in paper
+            lr=2e-4,
             weight_decay=self.training_args.weight_decay
         )
-        
-        # Calculate total training steps
         total_steps = len(self.train_loader) * self.training_args.num_train_epochs
         warmup_steps = int(total_steps * 0.03)  # 3% warmup
         
@@ -173,8 +144,6 @@ class Stage2Trainer:
         )
     
     def forward_step(self, batch: Dict) -> Dict:
-        """Forward pass through the model"""
-        # Move batch to device
         for key in batch:
             if isinstance(batch[key], torch.Tensor):
                 batch[key] = batch[key].to(self.model.device)
@@ -197,8 +166,6 @@ class Stage2Trainer:
             hidden_states=hidden_states,
             attention_mask=batch['attention_mask']
         )
-        
-        # Calculate CTC loss
         log_probs = F.log_softmax(speech_outputs.logits, dim=-1)
         
         # Get sequence lengths for CTC
@@ -239,16 +206,10 @@ class Stage2Trainer:
                 continue
             
             self.optimizer.zero_grad()
-            
-            # Forward pass
             outputs = self.forward_step(batch)
             loss = outputs['loss']
             ctc_loss = outputs['ctc_loss']
-            
-            # Backward pass
             loss.backward()
-            
-            # Gradient clipping
             if self.training_args.max_grad_norm > 0:
                 torch.nn.utils.clip_grad_norm_(
                     [p for p in self.model.parameters() if p.requires_grad], 
@@ -257,21 +218,15 @@ class Stage2Trainer:
             
             self.optimizer.step()
             self.scheduler.step()
-            
-            # Update metrics
             total_loss += loss.item()
             total_ctc_loss += ctc_loss.item()
             num_batches += 1
-            
-            # Update progress bar
             progress_bar.set_postfix({
                 'loss': f"{loss.item():.4f}",
                 'ctc_loss': f"{ctc_loss.item():.4f}",
                 'avg_loss': f"{total_loss / num_batches:.4f}",
                 'lr': f"{self.scheduler.get_last_lr()[0]:.2e}"
             })
-            
-            # Log to wandb
             if self.training_args.report_to == "wandb" and batch_idx % 10 == 0:
                 wandb.log({
                     'train_loss': loss.item(),
@@ -287,7 +242,6 @@ class Stage2Trainer:
         }
     
     def validate(self) -> Dict:
-        """Validate the model"""
         if self.val_loader is None:
             return {}
         
@@ -312,23 +266,14 @@ class Stage2Trainer:
         }
     
     def save_checkpoint(self, epoch: int, output_dir: str):
-        """Save model checkpoint"""
         os.makedirs(output_dir, exist_ok=True)
-        
-        # Save model state
         checkpoint_path = os.path.join(output_dir, f"checkpoint-epoch-{epoch}")
         os.makedirs(checkpoint_path, exist_ok=True)
-        
-        # Save full model
         self.model.save_pretrained(checkpoint_path)
         self.tokenizer.save_pretrained(checkpoint_path)
-        
-        # Save speech decoder separately
         speech_decoder_path = os.path.join(checkpoint_path, "speech_decoder.bin")
         speech_decoder_state = self.model.get_model().speech_generator.state_dict()
         torch.save(speech_decoder_state, speech_decoder_path)
-        
-        # Save training state
         training_state = {
             'epoch': epoch,
             'optimizer': self.optimizer.state_dict(),
@@ -342,7 +287,6 @@ class Stage2Trainer:
         self.logger.info(f"Checkpoint saved to {checkpoint_path}")
     
     def train(self):
-        """Main training loop"""
         self.logger.info("Starting Stage 2 training...")
         self.logger.info(f"Total epochs: {self.training_args.num_train_epochs}")
         self.logger.info(f"Batch size: {self.training_args.per_device_train_batch_size}")
@@ -351,13 +295,8 @@ class Stage2Trainer:
         best_val_loss = float('inf')
         
         for epoch in range(1, self.training_args.num_train_epochs + 1):
-            # Train epoch
             train_metrics = self.train_epoch(epoch)
-            
-            # Validate
             val_metrics = self.validate()
-            
-            # Log epoch metrics
             self.logger.info(f"Epoch {epoch}: Train Loss = {train_metrics['train_loss']:.4f}, "
                            f"Train CTC Loss = {train_metrics['train_ctc_loss']:.4f}")
             if val_metrics:
@@ -370,12 +309,8 @@ class Stage2Trainer:
                     **val_metrics,
                     'epoch': epoch
                 })
-            
-            # Save checkpoint
             if epoch % self.training_args.save_steps == 0 or epoch == self.training_args.num_train_epochs:
                 self.save_checkpoint(epoch, self.training_args.output_dir)
-            
-            # Save best model
             if val_metrics and val_metrics['val_loss'] < best_val_loss:
                 best_val_loss = val_metrics['val_loss']
                 best_model_path = os.path.join(self.training_args.output_dir, "best_model")
@@ -383,8 +318,6 @@ class Stage2Trainer:
                 self.logger.info(f"New best model saved with val_loss: {best_val_loss:.4f}")
         
         self.logger.info("Stage 2 training completed!")
-        
-        # Save final model
         final_model_path = os.path.join(self.training_args.output_dir, "final_model")
         self.save_checkpoint(self.training_args.num_train_epochs, final_model_path)
         

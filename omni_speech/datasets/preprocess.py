@@ -115,7 +115,8 @@ def preprocess_llama_2(
     # Mask targets
     sep = "[/INST] "
     for conversation, target in zip(conversations, targets):
-        total_len = int(target.ne(tokenizer.pad_token_id).sum())
+        pad_token_id = tokenizer.pad_token_id if tokenizer.pad_token_id is not None else tokenizer.eos_token_id
+        total_len = int(target.ne(pad_token_id).sum())
 
         rounds = conversation.split(conv.sep2)
         cur_len = 1
@@ -199,7 +200,8 @@ def preprocess_llama_3(
     # Mask targets
     sep = "<|start_header_id|>" + conv.roles[1] + "<|end_header_id|>\n\n"
     for conversation, target in zip(conversations, targets):
-        total_len = int(target.ne(tokenizer.pad_token_id).sum())
+        pad_token_id = tokenizer.pad_token_id if tokenizer.pad_token_id is not None else tokenizer.eos_token_id
+        total_len = int(target.ne(pad_token_id).sum())
 
         cur_len = 1
         target[:cur_len] = IGNORE_INDEX
@@ -273,7 +275,8 @@ def preprocess_v1(
     # Mask targets
     sep = conv.sep + conv.roles[1] + ": "
     for conversation, target in zip(conversations, targets):
-        total_len = int(target.ne(tokenizer.pad_token_id).sum())
+        pad_token_id = tokenizer.pad_token_id if tokenizer.pad_token_id is not None else tokenizer.eos_token_id
+        total_len = int(target.ne(pad_token_id).sum())
 
         rounds = conversation.split(conv.sep2)
         cur_len = 1

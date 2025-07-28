@@ -6,7 +6,7 @@
     "validation_data_path": null
   },
   "model_args": {
-    "model_name_or_path": "allenai/OLMo-2-0425-1B-Instruct",
+    "model_name_or_path": "meta-llama/Llama-3.1-8B-Instruct",
     "version": "v0",
     "freeze_backbone": false,
     "tune_speech_projector": false,
@@ -17,19 +17,19 @@
     "pretrain_speech_projector": null,
     "speech_projector_type": "linear",
     "speech_generator_type": "ctc",
-    "ctc_decoder_config": "(2,4096,32,11008)",
+    "ctc_decoder_config": "(2,4096,2,11008)",
     "ctc_upsample_factor": 25,
     "ctc_loss_weight": 1.0,
     "unit_vocab_size": 1000,
     "speech_encoder_ds_rate": 5,
-    "speech_encoder_hidden_size": 1280
+    "speech_encoder_hidden_size": 384
   },
   "data_args": {
     "data_path": "/data/input/amanr/LLaMA-Omni/InstructS2S-200K/instruct_en_filtered.json",
     "is_multimodal": true,
     "input_type": "mel",
     "speech_normalize": false,
-    "mel_size": 128,
+    "mel_size": 80,
     "has_tgt_units": false,
     "validation_data_path": null
   },
@@ -41,8 +41,8 @@
     "do_predict": false,
     "eval_strategy": {},
     "prediction_loss_only": false,
-    "per_device_train_batch_size": 32,
-    "per_device_eval_batch_size": 32,
+    "per_device_train_batch_size": 2,
+    "per_device_eval_batch_size": 2,
     "per_gpu_train_batch_size": null,
     "per_gpu_eval_batch_size": null,
     "gradient_accumulation_steps": 1,
@@ -64,7 +64,7 @@
     "log_level": "passive",
     "log_level_replica": "warning",
     "log_on_each_node": true,
-    "logging_dir": "./outputs/stage1/runs/Jul27_01-58-14_triton-cs-aus-455.reviz.ai2.in",
+    "logging_dir": "./outputs/stage1/runs/Jul28_20-45-04_triton-cs-aus-455.reviz.ai2.in",
     "logging_strategy": {},
     "logging_first_step": false,
     "logging_steps": 10,
