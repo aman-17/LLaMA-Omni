@@ -27,6 +27,7 @@ class SeparatorStyle(Enum):
     PLAIN = auto()
     LLAMA_2 = auto()
     LLAMA_3 = auto()
+    OLMO = auto()
 
 
 @dataclasses.dataclass
@@ -97,6 +98,17 @@ class Conversation:
                 else:
                     ret += ""
             ret = ret.lstrip(self.sep)
+        elif self.sep_style == SeparatorStyle.OLMO:
+            ret = ""
+            if self.system:
+                ret += f"<|im_start|>system\n{self.system}<|im_end|>\n"
+            for i, (role, message) in enumerate(messages):
+                if message:
+                    if type(message) is tuple:
+                        message = message[0]
+                    ret += f"<|im_start|>{role}\n{message}<|im_end|>\n"
+                else:
+                    ret += f"<|im_start|>{role}\n"
         elif self.sep_style == SeparatorStyle.PLAIN:
             seps = [self.sep, self.sep2]
             ret = self.system
@@ -201,6 +213,17 @@ conv_plain = Conversation(
     sep="</s>",
 )
 
+conv_olmo = Conversation(
+    system="You are a helpful language and speech assistant. " "You are able to understand the speech content that the user provides, " "and assist the user with a variety of tasks using natural language.",
+    roles=("user", "assistant"),
+    version="olmo",
+    messages=[],
+    offset=0,
+    sep_style=SeparatorStyle.OLMO,
+    sep="",
+    sep2="",
+)
+
 
 default_conversation = conv_llama_3
 conv_templates = {
@@ -208,6 +231,7 @@ conv_templates = {
     "plain": conv_plain,
     "llama_2": conv_llama_2,
     "llama_3": conv_llama_3,
+    "olmo": conv_olmo,
 }
 
 

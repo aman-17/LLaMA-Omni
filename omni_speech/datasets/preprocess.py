@@ -343,6 +343,77 @@ def preprocess_plain(
     return dict(input_ids=input_ids, labels=targets)
 
 
+def preprocess_olmo(
+    sources,
+    tokenizer: transformers.PreTrainedTokenizer,
+    has_speech: bool = False
+) -> Dict:
+    conv = conversation_lib.default_conversation.copy()
+    roles = {"human": conv.roles[0], "gpt": conv.roles[1]}
+
+    # Apply prompt templates
+    conversations = []
+    for i, source in enumerate(sources):
+        if roles[source[0]["from"]] != conv.roles[0]:
+            # Skip the first one if it is not from human
+            source = source[1:]
+
+        conv.messages = []
+        for j, sentence in enumerate(source):
+            role = roles[sentence["from"]]
+            assert role == conv.roles[j % 2], f"{i}"
+            conv.append_message(role, sentence["value"])
+        conversations.append(conv.get_prompt())
+
+    # Tokenize conversations
+    if has_speech:
+        input_ids = torch.stack([tokenizer_speech_token(prompt, tokenizer, return_tensors='pt') for prompt in conversations], dim=0)
+    else:
+        input_ids = tokenizer(
+            conversations,
+            return_tensors="pt",
+            padding="longest",
+            max_length=tokenizer.model_max_length,
+            truncation=True,
+        ).input_ids
+
+    targets = input_ids.clone()
+
+    assert conv.sep_style == conversation_lib.SeparatorStyle.OLMO
+
+    # Mask targets - for OLMo we need to mask everything before the assistant's response
+    for conversation, target in zip(conversations, targets):
+        pad_token_id = tokenizer.pad_token_id if tokenizer.pad_token_id is not None else tokenizer.eos_token_id
+        total_len = int(target.ne(pad_token_id).sum())
+
+        # Find the assistant response start
+        assistant_start = f"<|im_start|>{conv.roles[1]}\n"
+        conversation_parts = conversation.split(assistant_start)
+        
+        if len(conversation_parts) >= 2:
+            # Everything before the assistant response should be masked
+            prefix = conversation_parts[0] + assistant_start
+            
+            if has_speech:
+                instruction_len = len(tokenizer_speech_token(prefix, tokenizer))
+            else:
+                instruction_len = len(tokenizer(prefix).input_ids)
+                
+            # Account for potential tokenizer differences
+            if instruction_len > 0:
+                instruction_len = min(instruction_len, total_len)
+                target[:instruction_len] = IGNORE_INDEX
+        else:
+            # If we can't find the pattern, mask everything (safer fallback)
+            target[:] = IGNORE_INDEX
+            print(f"WARNING: Could not find assistant response pattern in OLMo conversation")
+
+    return dict(
+        input_ids=input_ids,
+        labels=targets,
+    )
+
+
 def preprocess(
     sources: Sequence[str],
     tokenizer: transformers.PreTrainedTokenizer,
@@ -363,4 +434,6 @@ def preprocess(
         return preprocess_v1(sources, tokenizer, has_speech=has_speech)
     if conversation_lib.default_conversation.sep_style == conversation_lib.SeparatorStyle.LLAMA_3:
         return preprocess_llama_3(sources, tokenizer, has_speech=has_speech)
+    if conversation_lib.default_conversation.sep_style == conversation_lib.SeparatorStyle.OLMO:
+        return preprocess_olmo(sources, tokenizer, has_speech=has_speech)
     raise NotImplementedError
