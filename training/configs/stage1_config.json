@@ -2,8 +2,8 @@
   "stage": 1,
   "validation_data_path": null,
   "resume_from_checkpoint": null,
-  "model_name_or_path": "meta-llama/Llama-3.1-8B-Instruct",
-  "version": "v0",
+  "model_name_or_path": "allenai/OLMo-2-1124-7B",
+  "version": "olmo",
   "freeze_backbone": false,
   "tune_speech_projector": true,
   "tune_speech_encoder": false,
@@ -46,5 +46,5 @@
   "max_grad_norm": 0.3,
   "speech_projector_lr": null,
   "report_to": "wandb",
-  "run_name": "llama-omni-stage1"
+  "run_name": "olmo-omni-stage1"
 }

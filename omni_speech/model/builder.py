@@ -21,9 +21,34 @@ from transformers import AutoTokenizer, AutoModelForCausalLM, AutoConfig, BitsAn
 import torch
 from omni_speech.model import *
 from omni_speech.model.speech_encoder.builder import build_speech_encoder
+from omni_speech.conversation import set_default_conversation
+
+
+def is_olmo_model(model_path):
+    """Check if the model is an OLMo model"""
+    try:
+        config = AutoConfig.from_pretrained(model_path)
+        # Check for OLMo model identifiers
+        if hasattr(config, 'model_type'):
+            return 'olmo' in config.model_type.lower()
+        # Check model name/path for OLMo indicators
+        if 'olmo' in model_path.lower():
+            return True
+        return False
+    except:
+        return False
 
 
 def load_pretrained_model(model_path, model_base, is_lora=False, s2s=False, load_8bit=False, load_4bit=False, device="cuda", use_flash_attn=False, model_args=None, **kwargs):
+    # Set conversation template based on model_args version if provided
+    if model_args and hasattr(model_args, 'version') and model_args.version:
+        if model_args.version in ["olmo"]:
+            set_default_conversation(model_args.version)
+        elif model_args.version.startswith("v1"):
+            set_default_conversation("v1")
+        else:
+            # Keep default for other versions
+            pass
     if load_8bit:
         kwargs['load_in_8bit'] = True
     elif load_4bit:
@@ -40,15 +65,33 @@ def load_pretrained_model(model_path, model_base, is_lora=False, s2s=False, load
     if use_flash_attn:
         kwargs['attn_implementation'] = 'flash_attention_2'
     
-    # model_cls = OmniSpeech2SLlamaForCausalLM if s2s else OmniSpeechLlamaForCausalLM
-    model_cls = OmniSpeechLlamaForCausalLM
+    # Determine model class based on the base model type
+    if model_base and is_olmo_model(model_base):
+        model_cls = OmniSpeechOlmoForCausalLM
+        set_default_conversation("olmo")
+    elif model_path and is_olmo_model(model_path):
+        model_cls = OmniSpeechOlmoForCausalLM
+        set_default_conversation("olmo")
+    else:
+        # model_cls = OmniSpeech2SLlamaForCausalLM if s2s else OmniSpeechLlamaForCausalLM
+        model_cls = OmniSpeechLlamaForCausalLM
 
     # Load OmniSpeech model
     if is_lora:
         assert model_base is not None, "model_base is required for LoRA models."
-        from omni_speech.model.language_model.omni_speech_llama import OmniSpeechConfig
-        lora_cfg_pretrained = OmniSpeechConfig.from_pretrained(model_path)
-        tokenizer = AutoTokenizer.from_pretrained(model_base, use_fast=False)
+        if model_cls == OmniSpeechOlmoForCausalLM:
+            from omni_speech.model.language_model.omni_speech_olmo import OmniSpeechOlmoConfig
+            lora_cfg_pretrained = OmniSpeechOlmoConfig.from_pretrained(model_path)
+            lora_cfg_pretrained.model_name = model_base
+        else:
+            from omni_speech.model.language_model.omni_speech_llama import OmniSpeechConfig
+            lora_cfg_pretrained = OmniSpeechConfig.from_pretrained(model_path)
+        
+        if model_cls == OmniSpeechOlmoForCausalLM:
+            # Use the base OLMo model tokenizer, not the JSON file
+            tokenizer = AutoTokenizer.from_pretrained(model_base, use_fast=False)
+        else:
+            tokenizer = AutoTokenizer.from_pretrained(model_base, use_fast=False)
         print('Loading OmniSpeech from base model...')
         model = model_cls.from_pretrained(model_base, low_cpu_mem_usage=False, config=lora_cfg_pretrained, **kwargs)
         print('Loading additional OmniSpeech weights...')
@@ -67,8 +110,14 @@ def load_pretrained_model(model_path, model_base, is_lora=False, s2s=False, load
         print('Model is loaded...')
     elif model_base is not None:
         print('Loading OmniSpeech from base model...')
-        tokenizer = AutoTokenizer.from_pretrained(model_base, use_fast=False)
+        if model_cls == OmniSpeechOlmoForCausalLM:
+            # Use the base OLMo model tokenizer, not the JSON file
+            tokenizer = AutoTokenizer.from_pretrained(model_base, use_fast=False)
+        else:
+            tokenizer = AutoTokenizer.from_pretrained(model_base, use_fast=False)
         cfg_pretrained = AutoConfig.from_pretrained(model_path)
+        if model_cls == OmniSpeechOlmoForCausalLM:
+            cfg_pretrained.model_name = model_base
         model = model_cls.from_pretrained(model_base, low_cpu_mem_usage=False, config=cfg_pretrained, **kwargs)
         
         speech_projector_weights = torch.load(os.path.join(model_path, 'speech_projector.bin'), map_location='cpu')
@@ -77,9 +126,14 @@ def load_pretrained_model(model_path, model_base, is_lora=False, s2s=False, load
         model = model.to(device=device)
     else:
         tokenizer = AutoTokenizer.from_pretrained(model_path, use_fast=False)
+        cfg_pretrained = AutoConfig.from_pretrained(model_path)
+        if model_cls == OmniSpeechOlmoForCausalLM:
+            # For OLMo models, set the model_name to the model_path for loading
+            cfg_pretrained.model_name = model_path
         model = model_cls.from_pretrained(
             model_path,
             low_cpu_mem_usage=False,
+            config=cfg_pretrained,
             **kwargs
         )
         model = model.to(device=device)

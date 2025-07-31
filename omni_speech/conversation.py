@@ -234,6 +234,14 @@ conv_templates = {
     "olmo": conv_olmo,
 }
 
+def set_default_conversation(template_name):
+    """Set the default conversation template"""
+    global default_conversation
+    if template_name in conv_templates:
+        default_conversation = conv_templates[template_name]
+    else:
+        raise ValueError(f"Unknown conversation template: {template_name}")
+
 
 if __name__ == "__main__":
     print(default_conversation.get_prompt())
