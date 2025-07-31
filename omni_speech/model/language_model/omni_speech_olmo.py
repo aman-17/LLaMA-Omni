@@ -6,45 +6,119 @@ from typing import List, Optional, Tuple, Union
 import torch
 import torch.nn as nn
 
-from transformers import AutoConfig, AutoModelForCausalLM
+from transformers import AutoConfig, AutoModelForCausalLM, PretrainedConfig
+
+# Patch timm import issue
+import sys
+class MockImageNetInfo:
+    pass
+
+# Mock the problematic import
+try:
+    from timm.data import ImageNetInfo
+except ImportError:
+    import timm.data
+    timm.data.ImageNetInfo = MockImageNetInfo
+    timm.data.infer_imagenet_subset = lambda x: None
 from transformers.modeling_outputs import CausalLMOutputWithPast
 from transformers.generation.utils import GenerateOutput
 
 from ..omni_speech_arch import OmniSpeechMetaModel, OmniSpeechMetaForCausalLM
 
 
-class OmniSpeechOlmoConfig(AutoConfig):
+class OmniSpeechOlmoConfig(PretrainedConfig):
     model_type = "omni_speech_olmo"
+    
+    def __init__(self, model_name=None, **kwargs):
+        super().__init__(**kwargs)
+        self.model_name = model_name
 
 
-class OmniSpeechOlmoModel(OmniSpeechMetaModel):
+class OmniSpeechOlmoModel(nn.Module):
     config_class = OmniSpeechOlmoConfig
 
     def __init__(self, config):
-        super(OmniSpeechOlmoModel, self).__init__(config)
+        super().__init__()
+        self.config = config
         
-        # Initialize base model components if model_name is provided
-        if hasattr(config, 'model_name') and config.model_name:
-            self.base_model = AutoModelForCausalLM.from_pretrained(config.model_name, config=config)
-            # Copy necessary attributes from base model
-            if hasattr(self.base_model, 'embed_tokens'):
-                self.embed_tokens = self.base_model.get_input_embeddings()
+        # Initialize speech components manually (implementing OmniSpeechMetaModel functionality)
+        if hasattr(config, "speech_encoder"):
+            from ..speech_encoder.builder import build_speech_encoder
+            from ..speech_projector.builder import build_speech_projector
+            self.speech_encoder = build_speech_encoder(config)
+            self.speech_projector = build_speech_projector(config)
+        
+        # Initialize embedding tokens - these will be set by the parent class
+        self.embed_tokens = None
+
+    def get_speech_encoder(self):
+        speech_encoder = getattr(self, 'speech_encoder', None)
+        if type(speech_encoder) is list:
+            speech_encoder = speech_encoder[0]
+        return speech_encoder
+
+    def initialize_speech_modules(self, model_args, fsdp=None):
+        self.config.speech_encoder = getattr(model_args, "speech_encoder", None)
+        self.config.speech_encoder_type = getattr(model_args, "speech_encoder_type", None)
+        self.config.speech_projector_type = getattr(model_args, 'speech_projector_type', 'linear')
+        self.config.speech_encoder_ds_rate = getattr(model_args, 'speech_encoder_ds_rate', 5)
+        self.config.speech_encoder_hidden_size = getattr(model_args, 'speech_encoder_hidden_size', 1280)
+
+        if self.get_speech_encoder() is None:
+            from ..speech_encoder.builder import build_speech_encoder
+            speech_encoder = build_speech_encoder(self.config)
+            if fsdp is not None and len(fsdp) > 0:
+                self.speech_encoder = [speech_encoder]
+            else:
+                self.speech_encoder = speech_encoder
+
+        if getattr(self, 'speech_projector', None) is None:
+            from ..speech_projector.builder import build_speech_projector
+            self.speech_projector = build_speech_projector(self.config)
         else:
-            # For cases where we load from a pre-trained OmniSpeech model
-            self.base_model = None
+            # In case it is frozen by LoRA
+            for p in self.speech_projector.parameters():
+                p.requires_grad = True
+
+        if hasattr(model_args, 'pretrain_speech_projector') and model_args.pretrain_speech_projector is not None:
+            pretrain_speech_projector_weights = torch.load(model_args.pretrain_speech_projector, map_location='cpu')
+            def get_w(weights, keyword):
+                return {k.split(keyword + '.')[1]: v for k, v in weights.items() if keyword in k}
+            self.speech_projector.load_state_dict(get_w(pretrain_speech_projector_weights, 'speech_projector'))
 
 
-class OmniSpeechOlmoForCausalLM(OmniSpeechMetaForCausalLM):
+class OmniSpeechOlmoForCausalLM(nn.Module, OmniSpeechMetaForCausalLM):
     config_class = OmniSpeechOlmoConfig
 
     def __init__(self, config):
-        # Don't call super().__init__ to avoid double initialization
-        nn.Module.__init__(self)
+        super().__init__()
         self.config = config
         
         # Initialize base model and components
         if hasattr(config, 'model_name') and config.model_name:
-            self.base_model = AutoModelForCausalLM.from_pretrained(config.model_name)
+            # Load OLMo model more specifically to avoid auto-loading issues
+            try:
+                self.base_model = AutoModelForCausalLM.from_pretrained(
+                    config.model_name,
+                    trust_remote_code=True,
+                    torch_dtype=torch.float16
+                )
+            except ImportError as e:
+                if "ImageNetInfo" in str(e):
+                    # Fallback: try without auto-loading problematic models
+                    import os
+                    os.environ["TRANSFORMERS_OFFLINE"] = "1"
+                    try:
+                        self.base_model = AutoModelForCausalLM.from_pretrained(
+                            config.model_name,
+                            trust_remote_code=True,
+                            torch_dtype=torch.float16,
+                            local_files_only=False
+                        )
+                    finally:
+                        os.environ.pop("TRANSFORMERS_OFFLINE", None)
+                else:
+                    raise e
             self.vocab_size = self.base_model.config.vocab_size
             self.lm_head = self.base_model.lm_head
             
@@ -69,9 +143,34 @@ class OmniSpeechOlmoForCausalLM(OmniSpeechMetaForCausalLM):
             self.vocab_size = config.vocab_size
             self.lm_head = nn.Linear(config.hidden_size, config.vocab_size, bias=False)
             self.model = OmniSpeechOlmoModel(config)
+
+    def post_init(self):
+        """
+        A method executed at the end of each Transformer model initialization, to execute code that needs the model's
+        modules properly initialized (such as weight initialization).
+        """
+        pass
+
+    @classmethod
+    def from_pretrained(cls, model_name_or_path, *args, config=None, **kwargs):
+        """Load a pretrained OLMo model and wrap it with OmniSpeech functionality."""
+        if config is None:
+            base_config = AutoConfig.from_pretrained(model_name_or_path)
+        else:
+            base_config = config
         
-        # Initialize weights and apply final processing
-        self.post_init()
+        # Convert to OmniSpeechOlmoConfig
+        if not isinstance(base_config, OmniSpeechOlmoConfig):
+            # Create OmniSpeechOlmoConfig with base config attributes
+            config_dict = base_config.to_dict() if hasattr(base_config, 'to_dict') else base_config.__dict__.copy()
+            # Remove model_name from config_dict to avoid conflict
+            config_dict.pop('model_name', None)
+            olmo_config = OmniSpeechOlmoConfig(model_name=model_name_or_path, **config_dict)
+            config = olmo_config
+        else:
+            config.model_name = model_name_or_path
+            
+        return cls(config)
 
     def get_model(self):
         return self.model

@@ -161,6 +161,6 @@ def load_pretrained_model(model_path, model_base, is_lora=False, s2s=False, load
     if hasattr(model.config, "max_sequence_length"):
         context_len = model.config.max_sequence_length
     else:
-        context_len = 2048
+        context_len = 4096
 
     return tokenizer, model, context_len
