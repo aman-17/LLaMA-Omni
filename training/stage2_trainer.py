@@ -70,7 +70,7 @@ class Stage2Trainer:
         self.setup_optimizer_and_scheduler()
         if self.training_args.report_to == "wandb":
             wandb.init(
-                project="llama-omni-stage2",
+                project="aolmo",
                 config={
                     **vars(model_args),
                     **vars(data_args),

@@ -144,7 +144,7 @@ def main():
                 model_path=training_args.resume_from_checkpoint
             )
             
-            trained_model = trainer.train()
+            trainer.train()
             logger.info("Stage 1 training completed successfully!")
             
         elif training_config.stage == 2:
@@ -158,7 +158,7 @@ def main():
                 kmeans_model_path=training_config.kmeans_model_path
             )
         
-            trained_model = trainer.train()
+            trainer.train()
             logger.info("Stage 2 training completed successfully!")
     
     except Exception as e:

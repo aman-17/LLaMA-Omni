@@ -26,14 +26,14 @@ class Stage1Trainer:
         self.model_args = model_args
         self.data_args = data_args
         self.training_args = training_args
-        logging.basicConfig(level=logging.INFO)
+        logging.basicConfig(level=logging.DEBUG)
         self.logger = logging.getLogger(__name__)
         self.setup_model(model_path)
         self.setup_data_loaders()
         self.setup_optimizer_and_scheduler()
         if self.training_args.report_to == "wandb":
             wandb.init(
-                project="aolmo-stage1",
+                project="aolmo",
                 config={
                     **vars(model_args),
                     **vars(data_args),
@@ -158,7 +158,7 @@ class Stage1Trainer:
         for key in batch:
             if isinstance(batch[key], torch.Tensor):
                 batch[key] = batch[key].to(self.model.device)
-        
+                
         outputs = self.model(
             input_ids=batch['input_ids'],
             attention_mask=batch['attention_mask'],
@@ -187,7 +187,7 @@ class Stage1Trainer:
             loss = outputs['loss']
             loss.backward()
             if self.training_args.max_grad_norm > 0:
-                torch.nn.utils.clip_grad_norm_(
+                grad_norm = torch.nn.utils.clip_grad_norm_(
                     self.model.parameters(), 
                     self.training_args.max_grad_norm
                 )
@@ -202,11 +202,34 @@ class Stage1Trainer:
                 'lr': f"{self.scheduler.get_last_lr()[0]:.2e}"
             })
             if self.training_args.report_to == "wandb" and batch_idx % 10 == 0:
+                total_grad_norm = 0
+                param_count = 0
+                for param in self.model.parameters():
+                    if param.grad is not None:
+                        total_grad_norm += param.grad.data.norm(2).item() ** 2
+                        param_count += 1
+                total_grad_norm = total_grad_norm ** 0.5
+                
+                speech = batch['speech_features']
+                speech_lengths = batch['speech_lengths']
+                
                 wandb.log({
-                    'train_loss': loss.item(),
-                    'learning_rate': self.scheduler.get_last_lr()[0],
-                    'epoch': epoch,
-                    'step': epoch * len(self.train_loader) + batch_idx
+                    'train/loss': loss.item(),
+                    'train/avg_loss': total_loss / num_batches,
+                    'train/learning_rate': self.scheduler.get_last_lr()[0],
+                    'train/gradient_norm': total_grad_norm,
+                    'train/epoch': epoch,
+                    'train/step': epoch * len(self.train_loader) + batch_idx,
+                    'train/batch_idx': batch_idx,
+                    'system/epoch_progress': batch_idx / len(self.train_loader),
+                    'speech/min_value': speech.min().item(),
+                    'speech/max_value': speech.max().item(),
+                    'speech/mean_value': speech.mean().item(),
+                    'speech/std_value': speech.std().item(),
+                    'speech/avg_length': speech_lengths.float().mean().item(),
+                    'speech/max_length': speech_lengths.max().item(),
+                    'speech/min_length': speech_lengths.min().item(),
+                    'speech/batch_size': speech.shape[0]
                 })
         
         return {'train_loss': total_loss / num_batches if num_batches > 0 else 0}
@@ -259,9 +282,7 @@ class Stage1Trainer:
         self.logger.info(f"Total epochs: {self.training_args.num_train_epochs}")
         self.logger.info(f"Batch size: {self.training_args.per_device_train_batch_size}")
         self.logger.info(f"Learning rate: {self.training_args.learning_rate}")
-        
         best_val_loss = float('inf')
-        
         for epoch in range(1, self.training_args.num_train_epochs + 1):
             train_metrics = self.train_epoch(epoch)
             val_metrics = self.validate()
@@ -270,11 +291,26 @@ class Stage1Trainer:
                 self.logger.info(f"Epoch {epoch}: Val Loss = {val_metrics['val_loss']:.4f}")
             
             if self.training_args.report_to == "wandb":
-                wandb.log({
-                    **train_metrics,
-                    **val_metrics,
-                    'epoch': epoch
+                log_dict = {
+                    'epoch/train_loss': train_metrics['train_loss'],
+                    'epoch/epoch_num': epoch,
+                    'system/total_epochs': self.training_args.num_train_epochs,
+                    'system/progress': epoch / self.training_args.num_train_epochs
+                }
+                
+                if val_metrics:
+                    log_dict['epoch/val_loss'] = val_metrics['val_loss']
+                    log_dict['epoch/val_train_diff'] = val_metrics['val_loss'] - train_metrics['train_loss']
+                
+                total_params = sum(p.numel() for p in self.model.parameters())
+                trainable_params = sum(p.numel() for p in self.model.parameters() if p.requires_grad)
+                log_dict.update({
+                    'model/total_params': total_params,
+                    'model/trainable_params': trainable_params,
+                    'model/frozen_params': total_params - trainable_params
                 })
+                
+                wandb.log(log_dict)
             
             if epoch % self.training_args.save_steps == 0 or epoch == self.training_args.num_train_epochs:
                 self.save_checkpoint(epoch, self.training_args.output_dir)

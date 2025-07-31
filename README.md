@@ -48,10 +48,13 @@ cd LLaMA-Omni
 2. Install packages.
 
 ```shell
-conda create -n llama-omni python=3.10
+conda create -n llama-omni python=3.10 -y
 conda activate llama-omni
 pip install pip==24.0
 pip install -e .
+cd fairseq
+pip install -e . --no-build-isolation
+cd ..
 ```
 
 3. Install `fairseq`.

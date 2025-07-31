@@ -5,7 +5,7 @@
   "model_name_or_path": "meta-llama/Llama-3.1-8B-Instruct",
   "version": "v0",
   "freeze_backbone": false,
-  "tune_speech_projector": false,
+  "tune_speech_projector": true,
   "tune_speech_encoder": false,
   "tune_speech_generator_only": false,
   "speech_encoder_type": "whisper",
@@ -34,7 +34,7 @@
   "save_strategy": "epoch",
   "save_steps": 1,
   "save_total_limit": 3,
-  "learning_rate": 2e-05,
+  "learning_rate": 2e-06,
   "weight_decay": 0.0,
   "warmup_ratio": 0.03,
   "lr_scheduler_type": "cosine",
@@ -43,8 +43,8 @@
   "dataloader_drop_last": false,
   "dataloader_num_workers": 4,
   "dataloader_pin_memory": true,
-  "max_grad_norm": 1.0,
+  "max_grad_norm": 0.3,
   "speech_projector_lr": null,
   "report_to": "wandb",
-  "run_name": "olmo21b-omni-stage1"
+  "run_name": "llama-omni-stage1"
 }

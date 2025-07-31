@@ -122,7 +122,7 @@ class InstructS2SDataset(Dataset):
             # Convert to log scale (dB)
             mel = librosa.power_to_db(mel, ref=np.max)
             # Normalize to [-1, 1] range as expected by Whisper
-            mel = (mel + 80) / 80
+            mel = np.clip((mel + 80) / 80, -1, 1)
             mel = torch.from_numpy(mel).float()
             mel_transposed = mel.transpose(0, 1)  # (time, mel_dim)
             
@@ -138,10 +138,9 @@ class InstructS2SDataset(Dataset):
                 padding = torch.zeros(target_length - current_length, mel_transposed.shape[1])
                 mel_transposed = torch.cat([mel_transposed, padding], dim=0)
             
-            # print(f"DEBUG: Audio path: {audio_path}")
-            # print(f"DEBUG: Original mel shape: {mel.shape}")
-            # print(f"DEBUG: Final mel shape: {mel_transposed.shape}")
-            # print(f"DEBUG: Mel min/max: {mel_transposed.min():.3f}/{mel_transposed.max():.3f}")
+            if torch.isnan(mel_transposed).any() or torch.isinf(mel_transposed).any():
+                mel_transposed = torch.zeros_like(mel_transposed)
+            
             return mel_transposed
         else:
             audio, sr = torchaudio.load(audio_path)
