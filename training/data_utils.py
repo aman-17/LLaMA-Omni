@@ -178,7 +178,7 @@ class InstructS2SDataset(Dataset):
     
     def __getitem__(self, idx: int) -> Dict:
         item = self.data[idx]
-        speech_path = item['speech_instruction_path']
+        speech_path = os.path.join(os.path.dirname(self.data_path), item['speech_instruction_path'])
         speech_features = self.load_audio(speech_path)
         conversation = [
             {"from": "human", "value": DEFAULT_SPEECH_TOKEN + "\n" + item.get('text_instruction', '')},
@@ -197,7 +197,8 @@ class InstructS2SDataset(Dataset):
             if 'speech_units' in item and item['speech_units']:
                 speech_units = self.extract_speech_units(units_string=item['speech_units'])
             elif 'speech_response_path' in item and item['speech_response_path']:
-                speech_units = self.extract_speech_units(audio_path=item['speech_response_path'])
+                response_audio_path = os.path.join(os.path.dirname(self.data_path), item['speech_response_path'])
+                speech_units = self.extract_speech_units(audio_path=response_audio_path)
             
             if speech_units:
                 result['speech_units'] = torch.tensor(speech_units, dtype=torch.long)

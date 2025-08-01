@@ -175,6 +175,14 @@ class OmniSpeechOlmoForCausalLM(nn.Module, OmniSpeechMetaForCausalLM):
     def get_model(self):
         return self.model
 
+    @property
+    def device(self):
+        """Return the device of the model parameters"""
+        if self.base_model is not None:
+            return next(self.base_model.parameters()).device
+        else:
+            return next(self.parameters()).device
+
     def forward(
         self,
         input_ids: torch.LongTensor = None,
