@@ -2,7 +2,7 @@
 set -e
 
 CONFIG_PATH=${1:-"/data/input/amanr/LLaMA-Omni/training/configs/stage1_config.json"}
-DATA_PATH=${2:-"/data/input/amanr/LLaMA-Omni/InstructS2S-200K/instruct_en_200k_data_cosy2.json"}
+DATA_PATH=${2:-"/data/input/amanr/LLaMA-Omni/InstructS2S-200K/instruct_en_train.json"}
 OUTPUT_DIR=${3:-"./outputs/stage1"}
 
 

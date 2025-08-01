@@ -31,15 +31,29 @@ class Stage1Trainer:
         self.setup_model(model_path)
         self.setup_data_loaders()
         self.setup_optimizer_and_scheduler()
-        if self.training_args.report_to == "wandb":
-            wandb.init(
-                project="aolmo",
-                config={
-                    **vars(model_args),
-                    **vars(data_args),
-                    **vars(training_args)
-                }
-            )
+        
+        # Handle both string and list formats for report_to
+        report_to = self.training_args.report_to
+        if isinstance(report_to, list):
+            wandb_enabled = "wandb" in report_to
+        else:
+            wandb_enabled = report_to == "wandb" or "wandb" in str(report_to)
+        
+        if wandb_enabled:
+            try:
+                wandb.init(
+                    project="aolmo",
+                    name=self.training_args.run_name,
+                    config={
+                        **vars(model_args),
+                        **vars(data_args),
+                        **vars(training_args)
+                    },
+                    reinit=True
+                )
+                self.logger.info(f"Initialized wandb run: {wandb.run.url}")
+            except Exception as e:
+                self.logger.error(f"Failed to initialize wandb: {e}")
     
     def setup_model(self, model_path: Optional[str] = None):
         if model_path:
@@ -201,7 +215,14 @@ class Stage1Trainer:
                 'avg_loss': f"{total_loss / num_batches:.4f}",
                 'lr': f"{self.scheduler.get_last_lr()[0]:.2e}"
             })
-            if self.training_args.report_to == "wandb" and batch_idx % 10 == 0:
+            # Check wandb logging condition
+            report_to = self.training_args.report_to
+            if isinstance(report_to, list):
+                wandb_enabled = "wandb" in report_to
+            else:
+                wandb_enabled = report_to == "wandb" or "wandb" in str(report_to)
+                
+            if wandb_enabled and batch_idx % 10 == 0:
                 total_grad_norm = 0
                 param_count = 0
                 for param in self.model.parameters():
@@ -213,24 +234,48 @@ class Stage1Trainer:
                 speech = batch['speech_features']
                 speech_lengths = batch['speech_lengths']
                 
-                wandb.log({
-                    'train/loss': loss.item(),
-                    'train/avg_loss': total_loss / num_batches,
-                    'train/learning_rate': self.scheduler.get_last_lr()[0],
-                    'train/gradient_norm': total_grad_norm,
-                    'train/epoch': epoch,
-                    'train/step': epoch * len(self.train_loader) + batch_idx,
-                    'train/batch_idx': batch_idx,
-                    'system/epoch_progress': batch_idx / len(self.train_loader),
-                    'speech/min_value': speech.min().item(),
-                    'speech/max_value': speech.max().item(),
-                    'speech/mean_value': speech.mean().item(),
-                    'speech/std_value': speech.std().item(),
-                    'speech/avg_length': speech_lengths.float().mean().item(),
-                    'speech/max_length': speech_lengths.max().item(),
-                    'speech/min_length': speech_lengths.min().item(),
-                    'speech/batch_size': speech.shape[0]
-                })
+                try:
+                    log_data = {
+                        'train/loss': loss.item(),
+                        'train/avg_loss': total_loss / num_batches,
+                        'train/learning_rate': self.scheduler.get_last_lr()[0],
+                        'train/gradient_norm': total_grad_norm,
+                        'train/epoch': epoch,
+                        'train/step': epoch * len(self.train_loader) + batch_idx,
+                        'train/batch_idx': batch_idx,
+                        'system/epoch_progress': batch_idx / len(self.train_loader),
+                        'speech/min_value': speech.min().item(),
+                        'speech/max_value': speech.max().item(),
+                        'speech/mean_value': speech.mean().item(),
+                        'speech/std_value': speech.std().item(),
+                        'speech/avg_length': speech_lengths.float().mean().item(),
+                        'speech/max_length': speech_lengths.max().item(),
+                        'speech/min_length': speech_lengths.min().item(),
+                        'speech/batch_size': speech.shape[0]
+                    }
+                    wandb.log(log_data)
+                except Exception as e:
+                    self.logger.warning(f"Failed to log to wandb: {e}")
+            
+            # Step-based validation every 2000 steps
+            current_step = epoch * len(self.train_loader) + batch_idx
+            if hasattr(self.training_args, 'eval_steps') and self.training_args.eval_steps > 0:
+                if current_step > 0 and current_step % self.training_args.eval_steps == 0:
+                    self.logger.info(f"Running validation at step {current_step}")
+                    val_metrics = self.validate()
+                    if val_metrics:
+                        self.logger.info(f"Step {current_step}: Val Loss = {val_metrics['val_loss']:.4f}")
+                        
+                        # Log validation metrics to wandb
+                        if wandb_enabled:
+                            try:
+                                wandb.log({
+                                    'val/loss': val_metrics['val_loss'],
+                                    'val/step': current_step,
+                                    'val/epoch': epoch + (batch_idx / len(self.train_loader))
+                                })
+                            except Exception as e:
+                                self.logger.warning(f"Failed to log validation to wandb: {e}")
         
         return {'train_loss': total_loss / num_batches if num_batches > 0 else 0}
     
@@ -290,7 +335,14 @@ class Stage1Trainer:
             if val_metrics:
                 self.logger.info(f"Epoch {epoch}: Val Loss = {val_metrics['val_loss']:.4f}")
             
-            if self.training_args.report_to == "wandb":
+            # Check wandb logging for epoch metrics
+            report_to = self.training_args.report_to
+            if isinstance(report_to, list):
+                wandb_enabled = "wandb" in report_to
+            else:
+                wandb_enabled = report_to == "wandb" or "wandb" in str(report_to)
+                
+            if wandb_enabled:
                 log_dict = {
                     'epoch/train_loss': train_metrics['train_loss'],
                     'epoch/epoch_num': epoch,
