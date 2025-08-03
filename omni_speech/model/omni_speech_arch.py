@@ -108,6 +108,10 @@ class OmniSpeechMetaForCausalLM(ABC):
             speech_lengths = speech_lengths // speech_projector.k
         else:
             raise ValueError(f'Unknown speech projector: {speech_projector_type}')
+        
+        # Ensure speech_lengths are at least 1 to avoid empty tensors
+        speech_lengths = torch.clamp(speech_lengths, min=1)
+        
         speech_features = [encoder_outs[i, :speech_lengths[i]] for i in range(len(encoder_outs))]
         return speech_features
 
