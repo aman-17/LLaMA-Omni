@@ -42,3 +42,4 @@ InstructS2S-200K/
 fairseq/
 outputs/
 wandb/
+venv/

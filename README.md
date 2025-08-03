@@ -51,7 +51,10 @@ cd LLaMA-Omni
 conda create -n llama-omni python=3.10 -y
 conda activate llama-omni
 pip install pip==24.0
-pip install -e .
+pip install "torch==2.1.2" "torchvision==0.16.2" "torchaudio==2.1.2" "transformers==4.43.4" "tokenizers==0.19.1" "sentencepiece==0.1.99" "shortuuid" "accelerate==0.33.0" "peft==0.11.1" "bitsandbytes==0.43.1" "pydantic" "markdown2[all]" "numpy" "scikit-learn==1.2.2" "gradio==4.43.0" "gradio_client==1.3.0" "requests" "httpx==0.27.2" "uvicorn" "fastapi" "soundfile" "einops==0.6.1" "einops-exts==0.0.4" "timm==0.6.13" "openai-whisper" "setuptools==59.5.0" "omegaconf==2.0.6" "fairseq" "wandb" "librosa"
+
+pip install -U pip
+pip install -U transformers
 cd fairseq
 pip install -e . --no-build-isolation
 cd ..

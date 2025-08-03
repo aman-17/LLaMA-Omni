@@ -1,6 +1,8 @@
 import os
 import torch
 import torch.nn as nn
+import torch.distributed as dist
+from torch.nn.parallel import DistributedDataParallel as DDP
 from torch.optim import AdamW
 from torch.optim.lr_scheduler import CosineAnnealingLR
 from transformers import get_cosine_schedule_with_warmup
@@ -21,39 +23,52 @@ class Stage1Trainer:
         model_args: ModelArguments,
         data_args: DataArguments,
         training_args: TrainingArguments,
-        model_path: Optional[str] = None
+        model_path: Optional[str] = None,
+        is_distributed: bool = False,
+        rank: int = 0,
+        world_size: int = 1,
+        local_rank: int = 0
     ):
         self.model_args = model_args
         self.data_args = data_args
         self.training_args = training_args
-        logging.basicConfig(level=logging.DEBUG)
+        self.is_distributed = is_distributed
+        self.rank = rank
+        self.world_size = world_size
+        self.local_rank = local_rank
+        
+        # Only setup logging on main process
+        if rank == 0:
+            logging.basicConfig(level=logging.DEBUG)
         self.logger = logging.getLogger(__name__)
+        
         self.setup_model(model_path)
         self.setup_data_loaders()
         self.setup_optimizer_and_scheduler()
         
-        # Handle both string and list formats for report_to
-        report_to = self.training_args.report_to
-        if isinstance(report_to, list):
-            wandb_enabled = "wandb" in report_to
-        else:
-            wandb_enabled = report_to == "wandb" or "wandb" in str(report_to)
-        
-        if wandb_enabled:
-            try:
-                wandb.init(
-                    project="aolmo",
-                    name=self.training_args.run_name,
-                    config={
-                        **vars(model_args),
-                        **vars(data_args),
-                        **vars(training_args)
-                    },
-                    reinit=True
-                )
-                self.logger.info(f"Initialized wandb run: {wandb.run.url}")
-            except Exception as e:
-                self.logger.error(f"Failed to initialize wandb: {e}")
+        # Handle both string and list formats for report_to (only on main process)
+        if self.rank == 0:
+            report_to = self.training_args.report_to
+            if isinstance(report_to, list):
+                wandb_enabled = "wandb" in report_to
+            else:
+                wandb_enabled = report_to == "wandb" or "wandb" in str(report_to)
+            
+            if wandb_enabled:
+                try:
+                    wandb.init(
+                        project="aolmo",
+                        name=self.training_args.run_name,
+                        config={
+                            **vars(model_args),
+                            **vars(data_args),
+                            **vars(training_args)
+                        },
+                        reinit=True
+                    )
+                    self.logger.info(f"Initialized wandb run: {wandb.run.url}")
+                except Exception as e:
+                    self.logger.error(f"Failed to initialize wandb: {e}")
     
     def setup_model(self, model_path: Optional[str] = None):
         if model_path:
@@ -70,12 +85,14 @@ class Stage1Trainer:
                 s2s=False,
                 model_args=self.model_args
             )
-        if not hasattr(self.model.get_model(), 'speech_projector') or self.model.get_model().speech_projector is None:
-            self.model.get_model().initialize_speech_modules(self.model_args)
-        for param in self.model.get_model().speech_encoder.parameters():
+        # Initialize speech modules before wrapping with DDP
+        underlying_model = self.model  # Before DDP wrapping
+        if not hasattr(underlying_model.get_model(), 'speech_projector') or underlying_model.get_model().speech_projector is None:
+            underlying_model.get_model().initialize_speech_modules(self.model_args)
+        for param in underlying_model.get_model().speech_encoder.parameters():
             param.requires_grad = False
         if self.model_args.freeze_backbone:
-            model_core = self.model.get_model()
+            model_core = underlying_model.get_model()
             if hasattr(model_core, 'model'):
                 for param in model_core.model.parameters():
                     param.requires_grad = False
@@ -87,23 +104,41 @@ class Stage1Trainer:
         if self.model_args.tune_speech_projector:
             for param in self.model.parameters():
                 param.requires_grad = False
-            for param in self.model.get_model().speech_projector.parameters():
+            for param in underlying_model.get_model().speech_projector.parameters():
                 param.requires_grad = True
         
-        self.logger.info(f"Model initialized. Trainable parameters: {self.count_trainable_params()}")
+        # Wrap model with DDP if distributed training is enabled
+        if self.is_distributed:
+            device = torch.device(f'cuda:{self.local_rank}')
+            self.model = self.model.to(device)
+            self.model = DDP(self.model, device_ids=[self.local_rank], output_device=self.local_rank)
+        
+        if self.rank == 0:
+            self.logger.info(f"Model initialized. Trainable parameters: {self.count_trainable_params()}")
     
     def count_trainable_params(self) -> int:
         return sum(p.numel() for p in self.model.parameters() if p.requires_grad)
     
+    def get_underlying_model(self):
+        """Get the underlying model, handling DDP wrapper"""
+        if self.is_distributed:
+            return self.model.module
+        return self.model
+    
     def setup_data_loaders(self):
+        # Use fewer workers in distributed training to avoid hanging
+        num_workers = 0 if self.is_distributed else 4
         self.train_loader = create_data_loader(
             data_path=self.data_args.data_path,
             tokenizer=self.tokenizer,
             data_args=self.data_args,
             batch_size=self.training_args.per_device_train_batch_size,
             stage=1,
-            num_workers=4,
-            shuffle=True
+            num_workers=num_workers,
+            shuffle=True,
+            is_distributed=self.is_distributed,
+            rank=self.rank,
+            world_size=self.world_size
         )
         
         if hasattr(self.data_args, 'validation_data_path') and self.data_args.validation_data_path:
@@ -113,15 +148,19 @@ class Stage1Trainer:
                 data_args=self.data_args,
                 batch_size=self.training_args.per_device_eval_batch_size,
                 stage=1,
-                num_workers=4,
-                shuffle=False
+                num_workers=num_workers,
+                shuffle=False,
+                is_distributed=self.is_distributed,
+                rank=self.rank,
+                world_size=self.world_size
             )
         else:
             self.val_loader = None
     
     def setup_optimizer_and_scheduler(self):
         param_groups = []
-        speech_projector_params = list(self.model.get_model().speech_projector.parameters())
+        underlying_model = self.get_underlying_model()
+        speech_projector_params = list(underlying_model.get_model().speech_projector.parameters())
         if speech_projector_params:
             lr = self.training_args.speech_projector_lr or self.training_args.learning_rate
             param_groups.append({
@@ -131,7 +170,7 @@ class Stage1Trainer:
             })
         
         if not self.model_args.freeze_backbone:
-            model_core = self.model.get_model()
+            model_core = underlying_model.get_model()
             if hasattr(model_core, 'model'):
                 llm_params = list(model_core.model.parameters())
             else:
@@ -146,7 +185,7 @@ class Stage1Trainer:
                 'name': 'llm'
             })
         
-        lm_head_params = list(self.model.lm_head.parameters())
+        lm_head_params = list(underlying_model.lm_head.parameters())
         param_groups.append({
             'params': lm_head_params,
             'lr': self.training_args.learning_rate,
@@ -169,9 +208,16 @@ class Stage1Trainer:
         )
     
     def forward_step(self, batch: Dict) -> Dict:
+        underlying_model = self.get_underlying_model()
+        # Get the model's dtype for proper conversion
+        model_dtype = next(underlying_model.parameters()).dtype
+        
         for key in batch:
             if isinstance(batch[key], torch.Tensor):
-                batch[key] = batch[key].to(self.model.device)
+                batch[key] = batch[key].to(underlying_model.device)
+                # Convert to appropriate dtype - keep integer types as-is, convert floating point types
+                if batch[key].dtype.is_floating_point:
+                    batch[key] = batch[key].to(dtype=model_dtype)
                 
         outputs = self.model(
             input_ids=batch['input_ids'],
@@ -189,10 +235,22 @@ class Stage1Trainer:
     
     def train_epoch(self, epoch: int) -> Dict:
         self.model.train()
+        
+        if self.is_distributed and hasattr(self.train_loader.sampler, 'set_epoch'):
+            self.train_loader.sampler.set_epoch(epoch)
+        
         total_loss = 0
         num_batches = 0
-        progress_bar = tqdm(self.train_loader, desc=f"Epoch {epoch}")
+        
+        if self.rank == 0:
+            print(f"Starting epoch {epoch}, data loader length: {len(self.train_loader)}")
+            progress_bar = tqdm(self.train_loader, desc=f"Epoch {epoch}")
+        else:
+            progress_bar = self.train_loader
+            
         for batch_idx, batch in enumerate(progress_bar):
+            if self.rank == 0 and batch_idx == 0:
+                print(f"Processing first batch...")
             if not batch:
                 continue
         
@@ -210,52 +268,56 @@ class Stage1Trainer:
             self.scheduler.step()
             total_loss += loss.item()
             num_batches += 1
-            progress_bar.set_postfix({
-                'loss': f"{loss.item():.4f}",
-                'avg_loss': f"{total_loss / num_batches:.4f}",
-                'lr': f"{self.scheduler.get_last_lr()[0]:.2e}"
-            })
-            # Check wandb logging condition
-            report_to = self.training_args.report_to
-            if isinstance(report_to, list):
-                wandb_enabled = "wandb" in report_to
-            else:
-                wandb_enabled = report_to == "wandb" or "wandb" in str(report_to)
-                
-            if wandb_enabled and batch_idx % 10 == 0:
-                total_grad_norm = 0
-                param_count = 0
-                for param in self.model.parameters():
-                    if param.grad is not None:
-                        total_grad_norm += param.grad.data.norm(2).item() ** 2
-                        param_count += 1
-                total_grad_norm = total_grad_norm ** 0.5
-                
-                speech = batch['speech_features']
-                speech_lengths = batch['speech_lengths']
-                
-                try:
-                    log_data = {
-                        'train/loss': loss.item(),
-                        'train/avg_loss': total_loss / num_batches,
-                        'train/learning_rate': self.scheduler.get_last_lr()[0],
-                        'train/gradient_norm': total_grad_norm,
-                        'train/epoch': epoch,
-                        'train/step': epoch * len(self.train_loader) + batch_idx,
-                        'train/batch_idx': batch_idx,
-                        'system/epoch_progress': batch_idx / len(self.train_loader),
-                        'speech/min_value': speech.min().item(),
-                        'speech/max_value': speech.max().item(),
-                        'speech/mean_value': speech.mean().item(),
-                        'speech/std_value': speech.std().item(),
-                        'speech/avg_length': speech_lengths.float().mean().item(),
-                        'speech/max_length': speech_lengths.max().item(),
-                        'speech/min_length': speech_lengths.min().item(),
-                        'speech/batch_size': speech.shape[0]
-                    }
-                    wandb.log(log_data)
-                except Exception as e:
-                    self.logger.warning(f"Failed to log to wandb: {e}")
+            
+            # Only update progress bar on main process
+            if self.rank == 0:
+                progress_bar.set_postfix({
+                    'loss': f"{loss.item():.4f}",
+                    'avg_loss': f"{total_loss / num_batches:.4f}",
+                    'lr': f"{self.scheduler.get_last_lr()[0]:.2e}"
+                })
+            # Check wandb logging condition (only on main process)
+            if self.rank == 0:
+                report_to = self.training_args.report_to
+                if isinstance(report_to, list):
+                    wandb_enabled = "wandb" in report_to
+                else:
+                    wandb_enabled = report_to == "wandb" or "wandb" in str(report_to)
+                    
+                if wandb_enabled and batch_idx % 10 == 0:
+                    total_grad_norm = 0
+                    param_count = 0
+                    for param in self.model.parameters():
+                        if param.grad is not None:
+                            total_grad_norm += param.grad.data.norm(2).item() ** 2
+                            param_count += 1
+                    total_grad_norm = total_grad_norm ** 0.5
+                    
+                    speech = batch['speech_features']
+                    speech_lengths = batch['speech_lengths']
+                    
+                    try:
+                        log_data = {
+                            'train/loss': loss.item(),
+                            'train/avg_loss': total_loss / num_batches,
+                            'train/learning_rate': self.scheduler.get_last_lr()[0],
+                            'train/gradient_norm': total_grad_norm,
+                            'train/epoch': epoch,
+                            'train/step': epoch * len(self.train_loader) + batch_idx,
+                            'train/batch_idx': batch_idx,
+                            'system/epoch_progress': batch_idx / len(self.train_loader),
+                            'speech/min_value': speech.min().item(),
+                            'speech/max_value': speech.max().item(),
+                            'speech/mean_value': speech.mean().item(),
+                            'speech/std_value': speech.std().item(),
+                            'speech/avg_length': speech_lengths.float().mean().item(),
+                            'speech/max_length': speech_lengths.max().item(),
+                            'speech/min_length': speech_lengths.min().item(),
+                            'speech/batch_size': speech.shape[0]
+                        }
+                        wandb.log(log_data)
+                    except Exception as e:
+                        self.logger.warning(f"Failed to log to wandb: {e}")
             
             # Step-based validation every 2000 steps
             current_step = epoch * len(self.train_loader) + batch_idx
@@ -298,18 +360,50 @@ class Stage1Trainer:
         
         return {'val_loss': total_loss / num_batches if num_batches > 0 else 0}
     
-    def save_checkpoint(self, epoch: int, output_dir: str):
+    def save_checkpoint(self, epoch: int, output_dir: str, is_best: bool = False):
         os.makedirs(output_dir, exist_ok=True)
         checkpoint_path = os.path.join(output_dir, f"checkpoint-epoch-{epoch}")
+        if is_best:
+            checkpoint_path = os.path.join(output_dir, "best_model")
         os.makedirs(checkpoint_path, exist_ok=True)
         
-        self.model.save_pretrained(checkpoint_path)
-        self.tokenizer.save_pretrained(checkpoint_path)
+        # Get the underlying model if wrapped with DDP
+        model_to_save = self.model.module if self.is_distributed else self.model
         
-        speech_projector_path = os.path.join(checkpoint_path, "speech_projector.bin")
-        speech_projector_state = self.model.get_model().speech_projector.state_dict()
-        torch.save(speech_projector_state, speech_projector_path)
+        # Save model using HuggingFace's save_pretrained method with safetensors
+        try:
+            model_to_save.save_pretrained(checkpoint_path, safe_serialization=True)
+            if self.rank == 0:
+                self.logger.info(f"Model saved in safetensors format to {checkpoint_path}")
+        except (AttributeError, RuntimeError) as e:
+            # If safetensors fails due to shared tensors, try without safe serialization
+            try:
+                model_to_save.save_pretrained(checkpoint_path, safe_serialization=False)
+                if self.rank == 0:
+                    self.logger.info(f"Model saved in pytorch format to {checkpoint_path}")
+            except (AttributeError, RuntimeError) as e2:
+                # Final fallback: manual state dict saving
+                if self.rank == 0:
+                    self.logger.warning(f"save_pretrained failed ({e2}), using fallback method")
+                model_state_path = os.path.join(checkpoint_path, "pytorch_model.bin")
+                torch.save(model_to_save.state_dict(), model_state_path)
         
+        # Save tokenizer
+        try:
+            self.tokenizer.save_pretrained(checkpoint_path)
+        except AttributeError:
+            # Fallback: save tokenizer state dict if available
+            if hasattr(self.tokenizer, 'state_dict'):
+                tokenizer_path = os.path.join(checkpoint_path, "tokenizer.bin")
+                torch.save(self.tokenizer.state_dict(), tokenizer_path)
+        
+        # Save speech projector separately for easier loading
+        if hasattr(model_to_save, 'get_model') and hasattr(model_to_save.get_model(), 'speech_projector'):
+            speech_projector_path = os.path.join(checkpoint_path, "speech_projector.bin")
+            speech_projector_state = model_to_save.get_model().speech_projector.state_dict()
+            torch.save(speech_projector_state, speech_projector_path)
+        
+        # Save training state
         training_state = {
             'epoch': epoch,
             'optimizer': self.optimizer.state_dict(),
@@ -320,60 +414,84 @@ class Stage1Trainer:
         }
         torch.save(training_state, os.path.join(checkpoint_path, "training_state.pt"))
         
+        # Save model config for easier loading
+        if hasattr(model_to_save, 'config'):
+            config_path = os.path.join(checkpoint_path, "config.json")
+            with open(config_path, 'w') as f:
+                import json
+                # Convert config to dict, handling any non-serializable attributes
+                if hasattr(model_to_save.config, '__dict__'):
+                    config_dict = {k: v for k, v in model_to_save.config.__dict__.items() 
+                                 if not callable(v) and not k.startswith('_')}
+                    json.dump(config_dict, f, indent=2, default=str)
+        
         self.logger.info(f"Checkpoint saved to {checkpoint_path}")
     
     def train(self):
-        self.logger.info("Starting Stage 1 training...")
-        self.logger.info(f"Total epochs: {self.training_args.num_train_epochs}")
-        self.logger.info(f"Batch size: {self.training_args.per_device_train_batch_size}")
-        self.logger.info(f"Learning rate: {self.training_args.learning_rate}")
+        if self.rank == 0:
+            self.logger.info("Starting Stage 1 training...")
+            self.logger.info(f"Total epochs: {self.training_args.num_train_epochs}")
+            self.logger.info(f"Batch size: {self.training_args.per_device_train_batch_size}")
+            self.logger.info(f"Learning rate: {self.training_args.learning_rate}")
+            print(f"About to start training loop with {self.training_args.num_train_epochs} epochs")
+        
         best_val_loss = float('inf')
         for epoch in range(1, self.training_args.num_train_epochs + 1):
+            if self.rank == 0:
+                print(f"Starting epoch {epoch}/{self.training_args.num_train_epochs}")
             train_metrics = self.train_epoch(epoch)
             val_metrics = self.validate()
-            self.logger.info(f"Epoch {epoch}: Train Loss = {train_metrics['train_loss']:.4f}")
-            if val_metrics:
-                self.logger.info(f"Epoch {epoch}: Val Loss = {val_metrics['val_loss']:.4f}")
             
-            # Check wandb logging for epoch metrics
-            report_to = self.training_args.report_to
-            if isinstance(report_to, list):
-                wandb_enabled = "wandb" in report_to
-            else:
-                wandb_enabled = report_to == "wandb" or "wandb" in str(report_to)
-                
-            if wandb_enabled:
-                log_dict = {
-                    'epoch/train_loss': train_metrics['train_loss'],
-                    'epoch/epoch_num': epoch,
-                    'system/total_epochs': self.training_args.num_train_epochs,
-                    'system/progress': epoch / self.training_args.num_train_epochs
-                }
-                
+            if self.rank == 0:
+                self.logger.info(f"Epoch {epoch}: Train Loss = {train_metrics['train_loss']:.4f}")
                 if val_metrics:
-                    log_dict['epoch/val_loss'] = val_metrics['val_loss']
-                    log_dict['epoch/val_train_diff'] = val_metrics['val_loss'] - train_metrics['train_loss']
+                    self.logger.info(f"Epoch {epoch}: Val Loss = {val_metrics['val_loss']:.4f}")
                 
-                total_params = sum(p.numel() for p in self.model.parameters())
-                trainable_params = sum(p.numel() for p in self.model.parameters() if p.requires_grad)
-                log_dict.update({
-                    'model/total_params': total_params,
-                    'model/trainable_params': trainable_params,
-                    'model/frozen_params': total_params - trainable_params
-                })
-                
-                wandb.log(log_dict)
+                # Check wandb logging for epoch metrics
+                report_to = self.training_args.report_to
+                if isinstance(report_to, list):
+                    wandb_enabled = "wandb" in report_to
+                else:
+                    wandb_enabled = report_to == "wandb" or "wandb" in str(report_to)
+                    
+                if wandb_enabled:
+                    log_dict = {
+                        'epoch/train_loss': train_metrics['train_loss'],
+                        'epoch/epoch_num': epoch,
+                        'system/total_epochs': self.training_args.num_train_epochs,
+                        'system/progress': epoch / self.training_args.num_train_epochs
+                    }
+                    
+                    if val_metrics:
+                        log_dict['epoch/val_loss'] = val_metrics['val_loss']
+                        log_dict['epoch/val_train_diff'] = val_metrics['val_loss'] - train_metrics['train_loss']
+                    
+                    total_params = sum(p.numel() for p in self.model.parameters())
+                    trainable_params = sum(p.numel() for p in self.model.parameters() if p.requires_grad)
+                    log_dict.update({
+                        'model/total_params': total_params,
+                        'model/trainable_params': trainable_params,
+                        'model/frozen_params': total_params - trainable_params
+                    })
+                    
+                    wandb.log(log_dict)
             
-            if epoch % self.training_args.save_steps == 0 or epoch == self.training_args.num_train_epochs:
-                self.save_checkpoint(epoch, self.training_args.output_dir)
-            if val_metrics and val_metrics['val_loss'] < best_val_loss:
-                best_val_loss = val_metrics['val_loss']
-                best_model_path = os.path.join(self.training_args.output_dir, "best_model")
-                self.save_checkpoint(epoch, best_model_path)
-                self.logger.info(f"New best model saved with val_loss: {best_val_loss:.4f}")
+            # Save checkpoints only on main process
+            if self.rank == 0:
+                if epoch % self.training_args.save_steps == 0 or epoch == self.training_args.num_train_epochs:
+                    self.save_checkpoint(epoch, self.training_args.output_dir)
+                if val_metrics and val_metrics['val_loss'] < best_val_loss:
+                    best_val_loss = val_metrics['val_loss']
+                    self.save_checkpoint(epoch, self.training_args.output_dir, is_best=True)
+                    self.logger.info(f"New best model saved with val_loss: {best_val_loss:.4f}")
+            
+            # Synchronize all processes after each epoch
+            if self.is_distributed:
+                dist.barrier()
         
-        self.logger.info("Stage 1 training completed!")
-        final_model_path = os.path.join(self.training_args.output_dir, "final_model")
-        self.save_checkpoint(self.training_args.num_train_epochs, final_model_path)
+        if self.rank == 0:
+            self.logger.info("Stage 1 training completed!")
+            final_model_path = os.path.join(self.training_args.output_dir, "final_model")
+            self.save_checkpoint(self.training_args.num_train_epochs, final_model_path)
         
         return self.model

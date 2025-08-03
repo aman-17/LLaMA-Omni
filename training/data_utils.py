@@ -8,7 +8,7 @@ import os
 import torch
 import torchaudio
 import numpy as np
-from torch.utils.data import Dataset
+from torch.utils.data import Dataset, DistributedSampler
 from typing import Dict, List, Optional, Tuple
 import librosa
 from omni_speech.datasets.preprocess import preprocess, preprocess_multimodal
@@ -274,7 +274,10 @@ def create_data_loader(
     stage: int = 1,
     kmeans_model_path: Optional[str] = None,
     num_workers: int = 4,
-    shuffle: bool = True
+    shuffle: bool = True,
+    is_distributed: bool = False,
+    rank: int = 0,
+    world_size: int = 1
 ):
     dataset = InstructS2SDataset(
         data_path=data_path,
@@ -284,10 +287,24 @@ def create_data_loader(
         kmeans_model_path=kmeans_model_path
     )
     collator = DataCollator(tokenizer, stage=stage)
+    
+    # Use DistributedSampler for distributed training
+    if is_distributed:
+        sampler = DistributedSampler(
+            dataset, 
+            num_replicas=world_size, 
+            rank=rank, 
+            shuffle=shuffle
+        )
+        shuffle = False  # Sampler handles shuffling
+    else:
+        sampler = None
+    
     return torch.utils.data.DataLoader(
         dataset,
         batch_size=batch_size,
         shuffle=shuffle,
+        sampler=sampler,
         num_workers=num_workers,
         collate_fn=collator,
         pin_memory=True
