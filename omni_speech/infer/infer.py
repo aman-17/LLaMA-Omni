@@ -47,7 +47,17 @@ class CustomDataset(Dataset):
         conv.append_message(conv.roles[1], None)
         prompt = conv.get_prompt()
 
-        speech = whisper.load_audio(speech_file)
+        # Use librosa instead of whisper.load_audio to avoid ffmpeg issues
+        try:
+            import librosa
+            speech, _ = librosa.load(speech_file, sr=16000, mono=True)
+        except ImportError:
+            # Fallback: use torchaudio
+            import torchaudio
+            speech, sr = torchaudio.load(speech_file)
+            if sr != 16000:
+                speech = torchaudio.functional.resample(speech, sr, 16000)
+            speech = speech.squeeze().numpy()
         if self.input_type == "raw":
             speech = torch.from_numpy(speech)
             if self.model_config.speech_normalize:
@@ -80,7 +90,7 @@ def ctc_postprocess(tokens, blank):
     return hyp
 
 # DataLoader
-def create_data_loader(questions, tokenizer, model_config, input_type, mel_size, conv_mode, batch_size=1, num_workers=4):
+def create_data_loader(questions, tokenizer, model_config, input_type, mel_size, conv_mode, batch_size=1, num_workers=0):
     assert batch_size == 1, "batch_size must be 1"
     dataset = CustomDataset(questions, tokenizer, model_config, input_type, mel_size, conv_mode)
     data_loader = DataLoader(dataset, batch_size=batch_size, num_workers=num_workers, shuffle=False, collate_fn=collate_fn)
@@ -126,7 +136,13 @@ def eval_model(args):
                     pad_token_id=128004,
                     streaming_unit_gen=False,
                 )
-                output_ids, output_units = outputs
+                # Handle different output formats from different models
+                if isinstance(outputs, tuple) and len(outputs) == 2:
+                    output_ids, output_units = outputs
+                else:
+                    # For models that only return text (like LLaMA), create dummy units
+                    output_ids = outputs
+                    output_units = None
             else:
                 outputs = model.generate(
                     input_ids,
@@ -143,8 +159,10 @@ def eval_model(args):
                 output_ids = outputs
 
         outputs = tokenizer.batch_decode(output_ids, skip_special_tokens=True)[0].strip()
-        if args.s2s:
+        if args.s2s and output_units is not None:
             output_units = ctc_postprocess(output_units, blank=model.config.unit_vocab_size)
+        elif args.s2s and output_units is None:
+            output_units = ""  # Empty string for models that don't generate audio units
 
         print(f"H-{idx}\t{outputs}")
         print(f"T-{idx}\t{answer}")

@@ -4,8 +4,8 @@ import torch.nn as nn
 import torch.distributed as dist
 from torch.nn.parallel import DistributedDataParallel as DDP
 from torch.optim import AdamW
-from torch.optim.lr_scheduler import CosineAnnealingLR
-from transformers import get_cosine_schedule_with_warmup
+from torch.optim.lr_scheduler import CosineAnnealingLR, LRScheduler
+from transformers import get_cosine_schedule_with_warmup, get_linear_schedule_with_warmup
 import logging
 from tqdm import tqdm
 from typing import Dict, Optional
@@ -201,7 +201,7 @@ class Stage1Trainer:
         total_steps = len(self.train_loader) * self.training_args.num_train_epochs
         warmup_steps = int(total_steps * 0.03)
         
-        self.scheduler = get_cosine_schedule_with_warmup(
+        self.scheduler = get_linear_schedule_with_warmup(
             self.optimizer,
             num_warmup_steps=warmup_steps,
             num_training_steps=total_steps
@@ -242,8 +242,13 @@ class Stage1Trainer:
         total_loss = 0
         num_batches = 0
         
+        # Get micro_batch_size from training_args, default to full batch if not specified
+        micro_batch_size = getattr(self.training_args, 'micro_batch_size', None)
+        
         if self.rank == 0:
             print(f"Starting epoch {epoch}, data loader length: {len(self.train_loader)}")
+            if micro_batch_size:
+                print(f"Using micro-batching with micro_batch_size: {micro_batch_size}")
             progress_bar = tqdm(self.train_loader, desc=f"Epoch {epoch}")
         else:
             progress_bar = self.train_loader
@@ -255,9 +260,37 @@ class Stage1Trainer:
                 continue
         
             self.optimizer.zero_grad()
-            outputs = self.forward_step(batch)
-            loss = outputs['loss']
-            loss.backward()
+            
+            if micro_batch_size and micro_batch_size < batch['input_ids'].size(0):
+                batch_size = batch['input_ids'].size(0)
+                total_loss_batch = 0.0
+                num_microbatches = 0
+                
+                for start_idx in range(0, batch_size, micro_batch_size):
+                    end_idx = min(start_idx + micro_batch_size, batch_size)
+                    microbatch = {}
+                    for key, value in batch.items():
+                        if isinstance(value, torch.Tensor):
+                            microbatch[key] = value[start_idx:end_idx]
+                        else:
+                            microbatch[key] = value[start_idx:end_idx]
+                    
+                    outputs = self.forward_step(microbatch)
+                    loss = outputs['loss']
+                    
+                    scaled_loss = loss / ((batch_size + micro_batch_size - 1) // micro_batch_size)
+                    scaled_loss.backward()
+                    
+                    total_loss_batch += loss.detach().item()
+                    num_microbatches += 1
+                
+                avg_loss = total_loss_batch / num_microbatches
+            else:
+                outputs = self.forward_step(batch)
+                loss = outputs['loss']
+                loss.backward()
+                avg_loss = loss.item()
+            
             if self.training_args.max_grad_norm > 0:
                 grad_norm = torch.nn.utils.clip_grad_norm_(
                     self.model.parameters(), 
@@ -266,23 +299,23 @@ class Stage1Trainer:
             
             self.optimizer.step()
             self.scheduler.step()
-            total_loss += loss.item()
+            total_loss += avg_loss
             num_batches += 1
             
-            # Only update progress bar on main process
             if self.rank == 0:
                 progress_bar.set_postfix({
-                    'loss': f"{loss.item():.4f}",
+                    'loss': f"{avg_loss:.4f}",
                     'avg_loss': f"{total_loss / num_batches:.4f}",
                     'lr': f"{self.scheduler.get_last_lr()[0]:.2e}"
                 })
-            # Check wandb logging condition (only on main process)
+            
+            report_to = self.training_args.report_to
+            if isinstance(report_to, list):
+                wandb_enabled = "wandb" in report_to
+            else:
+                wandb_enabled = report_to == "wandb" or "wandb" in str(report_to)
+            
             if self.rank == 0:
-                report_to = self.training_args.report_to
-                if isinstance(report_to, list):
-                    wandb_enabled = "wandb" in report_to
-                else:
-                    wandb_enabled = report_to == "wandb" or "wandb" in str(report_to)
                     
                 if wandb_enabled and batch_idx % 10 == 0:
                     total_grad_norm = 0
@@ -298,7 +331,7 @@ class Stage1Trainer:
                     
                     try:
                         log_data = {
-                            'train/loss': loss.item(),
+                            'train/loss': avg_loss,
                             'train/avg_loss': total_loss / num_batches,
                             'train/learning_rate': self.scheduler.get_last_lr()[0],
                             'train/gradient_norm': total_grad_norm,
@@ -306,20 +339,14 @@ class Stage1Trainer:
                             'train/step': epoch * len(self.train_loader) + batch_idx,
                             'train/batch_idx': batch_idx,
                             'system/epoch_progress': batch_idx / len(self.train_loader),
-                            'speech/min_value': speech.min().item(),
-                            'speech/max_value': speech.max().item(),
-                            'speech/mean_value': speech.mean().item(),
-                            'speech/std_value': speech.std().item(),
-                            'speech/avg_length': speech_lengths.float().mean().item(),
-                            'speech/max_length': speech_lengths.max().item(),
-                            'speech/min_length': speech_lengths.min().item(),
-                            'speech/batch_size': speech.shape[0]
+                            'train/batch_size': speech.shape[0]
                         }
+                        if micro_batch_size:
+                            log_data['train/micro_batch_size'] = micro_batch_size
                         wandb.log(log_data)
                     except Exception as e:
                         self.logger.warning(f"Failed to log to wandb: {e}")
             
-            # Step-based validation every 2000 steps
             current_step = epoch * len(self.train_loader) + batch_idx
             if hasattr(self.training_args, 'eval_steps') and self.training_args.eval_steps > 0:
                 if current_step > 0 and current_step % self.training_args.eval_steps == 0:
@@ -328,8 +355,7 @@ class Stage1Trainer:
                     if val_metrics:
                         self.logger.info(f"Step {current_step}: Val Loss = {val_metrics['val_loss']:.4f}")
                         
-                        # Log validation metrics to wandb
-                        if wandb_enabled:
+                        if self.rank == 0 and wandb_enabled:
                             try:
                                 wandb.log({
                                     'val/loss': val_metrics['val_loss'],
@@ -367,43 +393,35 @@ class Stage1Trainer:
             checkpoint_path = os.path.join(output_dir, "best_model")
         os.makedirs(checkpoint_path, exist_ok=True)
         
-        # Get the underlying model if wrapped with DDP
         model_to_save = self.model.module if self.is_distributed else self.model
         
-        # Save model using HuggingFace's save_pretrained method with safetensors
         try:
             model_to_save.save_pretrained(checkpoint_path, safe_serialization=True)
             if self.rank == 0:
                 self.logger.info(f"Model saved in safetensors format to {checkpoint_path}")
         except (AttributeError, RuntimeError) as e:
-            # If safetensors fails due to shared tensors, try without safe serialization
             try:
                 model_to_save.save_pretrained(checkpoint_path, safe_serialization=False)
                 if self.rank == 0:
                     self.logger.info(f"Model saved in pytorch format to {checkpoint_path}")
             except (AttributeError, RuntimeError) as e2:
-                # Final fallback: manual state dict saving
                 if self.rank == 0:
                     self.logger.warning(f"save_pretrained failed ({e2}), using fallback method")
                 model_state_path = os.path.join(checkpoint_path, "pytorch_model.bin")
                 torch.save(model_to_save.state_dict(), model_state_path)
         
-        # Save tokenizer
         try:
             self.tokenizer.save_pretrained(checkpoint_path)
         except AttributeError:
-            # Fallback: save tokenizer state dict if available
             if hasattr(self.tokenizer, 'state_dict'):
                 tokenizer_path = os.path.join(checkpoint_path, "tokenizer.bin")
                 torch.save(self.tokenizer.state_dict(), tokenizer_path)
         
-        # Save speech projector separately for easier loading
         if hasattr(model_to_save, 'get_model') and hasattr(model_to_save.get_model(), 'speech_projector'):
             speech_projector_path = os.path.join(checkpoint_path, "speech_projector.bin")
             speech_projector_state = model_to_save.get_model().speech_projector.state_dict()
             torch.save(speech_projector_state, speech_projector_path)
         
-        # Save training state
         training_state = {
             'epoch': epoch,
             'optimizer': self.optimizer.state_dict(),
@@ -414,12 +432,10 @@ class Stage1Trainer:
         }
         torch.save(training_state, os.path.join(checkpoint_path, "training_state.pt"))
         
-        # Save model config for easier loading
         if hasattr(model_to_save, 'config'):
             config_path = os.path.join(checkpoint_path, "config.json")
             with open(config_path, 'w') as f:
                 import json
-                # Convert config to dict, handling any non-serializable attributes
                 if hasattr(model_to_save.config, '__dict__'):
                     config_dict = {k: v for k, v in model_to_save.config.__dict__.items() 
                                  if not callable(v) and not k.startswith('_')}
@@ -446,8 +462,7 @@ class Stage1Trainer:
                 self.logger.info(f"Epoch {epoch}: Train Loss = {train_metrics['train_loss']:.4f}")
                 if val_metrics:
                     self.logger.info(f"Epoch {epoch}: Val Loss = {val_metrics['val_loss']:.4f}")
-                
-                # Check wandb logging for epoch metrics
+            
                 report_to = self.training_args.report_to
                 if isinstance(report_to, list):
                     wandb_enabled = "wandb" in report_to
@@ -468,15 +483,14 @@ class Stage1Trainer:
                     
                     total_params = sum(p.numel() for p in self.model.parameters())
                     trainable_params = sum(p.numel() for p in self.model.parameters() if p.requires_grad)
-                    log_dict.update({
-                        'model/total_params': total_params,
-                        'model/trainable_params': trainable_params,
-                        'model/frozen_params': total_params - trainable_params
-                    })
+                    # log_dict.update({
+                    #     'model/total_params': total_params,
+                    #     'model/trainable_params': trainable_params,
+                    #     'model/frozen_params': total_params - trainable_params
+                    # })
                     
                     wandb.log(log_dict)
             
-            # Save checkpoints only on main process
             if self.rank == 0:
                 if epoch % self.training_args.save_steps == 0 or epoch == self.training_args.num_train_epochs:
                     self.save_checkpoint(epoch, self.training_args.output_dir)
@@ -485,7 +499,6 @@ class Stage1Trainer:
                     self.save_checkpoint(epoch, self.training_args.output_dir, is_best=True)
                     self.logger.info(f"New best model saved with val_loss: {best_val_loss:.4f}")
             
-            # Synchronize all processes after each epoch
             if self.is_distributed:
                 dist.barrier()
         

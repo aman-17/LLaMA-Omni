@@ -45,8 +45,10 @@ class Stage1Inferencer:
         # Disable torch init for faster loading (following official script)
         disable_torch_init()
         
-        # Load training config from parent directory to get model_base
-        training_config_path = os.path.join(os.path.dirname(self.model_path), "training_config.json")
+        # Handle trailing slash issue
+        model_dir = self.model_path.rstrip('/')
+        parent_dir = os.path.dirname(model_dir)
+        training_config_path = os.path.join(parent_dir, "training_config.json")
         model_base = None
         if os.path.exists(training_config_path):
             with open(training_config_path, 'r') as f:
@@ -54,19 +56,20 @@ class Stage1Inferencer:
             
             # Extract model base from training config
             model_args_dict = training_config.get('model_args', {})
-            model_base = model_args_dict.get('model_name_or_path', 'allenai/OLMo-2-0425-1B-Instruct')
+            model_base = model_args_dict.get('model_name_or_path', 'allenai/OLMo-2-1124-7B-Instruct')
             
             logger.info(f"Loaded training config - model base: {model_base}")
         else:
             # Fallback defaults
-            model_base = 'allenai/OLMo-2-0425-1B-Instruct'
+            model_base = 'allenai/OLMo-2-1124-7B-Instruct'
             logger.warning(f"No training config found, using default model base: {model_base}")
         
-        # Load model using official pattern (same as omni_speech/infer/infer.py)
+        # Load model using official pattern 
+        # For trained models, don't pass model_base to load from local checkpoint
         try:
             self.tokenizer, self.model, self.context_len = load_pretrained_model(
                 model_path=self.model_path,
-                model_base=model_base,
+                model_base=None,  # Load from local checkpoint, not base model
                 is_lora=False,
                 s2s=False
             )

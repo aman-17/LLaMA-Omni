@@ -2,8 +2,8 @@
 set -e
 
 CONFIG_PATH=${1:-"/data/input/amanr/LLaMA-Omni/training/configs/stage1_config.json"}
-DATA_PATH=${2:-"/data/input/amanr/LLaMA-Omni/InstructS2S-200K/instruct_en_train_small.json"}
-OUTPUT_DIR=${3:-"./outputs/stage1"}
+DATA_PATH=${2:-"/data/input/amanr/LLaMA-Omni/InstructS2S-200K/instruct_en_train.json"}
+OUTPUT_DIR=${3:-"./outputs/olmo7b_tiny_stage1"}
 NNODES=${4:-1}
 NPROC_PER_NODE=${5:-$(nvidia-smi -L | wc -l)}
 NODE_RANK=${6:-0}

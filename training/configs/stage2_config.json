@@ -11,7 +11,7 @@
   "tune_speech_encoder": false,
   "tune_speech_generator_only": true,
   "speech_encoder_type": "whisper",
-  "speech_encoder": "openai/whisper-large-v3",
+  "speech_encoder": "tiny.en",
   "pretrain_speech_projector": null,
   "speech_projector_type": "linear",
   "speech_generator_type": "ctc",

@@ -143,15 +143,15 @@ def load_pretrained_model(model_path, model_base, is_lora=False, s2s=False, load
         if hasattr(model_args, 'speech_encoder') and model_args.speech_encoder:
             model.config.speech_encoder = model_args.speech_encoder
         elif not hasattr(model.config, 'speech_encoder'):
-            model.config.speech_encoder = "openai/whisper-large-v3"
-            
+            model.config.speech_encoder = "tiny.en"
+
         if hasattr(model_args, 'speech_encoder_type') and model_args.speech_encoder_type:
             model.config.speech_encoder_type = model_args.speech_encoder_type
         elif not hasattr(model.config, 'speech_encoder_type'):
             model.config.speech_encoder_type = "whisper"
     else:
         if not hasattr(model.config, 'speech_encoder'):
-            model.config.speech_encoder = "openai/whisper-large-v3"
+            model.config.speech_encoder = "tiny.en"
         if not hasattr(model.config, 'speech_encoder_type'):
             model.config.speech_encoder_type = "whisper"
     

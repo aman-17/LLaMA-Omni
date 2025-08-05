@@ -20,13 +20,12 @@ export PYTHONPATH="${PYTHONPATH}:$(pwd)"
 export PYTORCH_DISABLE_META_TENSORS=1
 
 python ./omni_speech/infer/infer.py \
-    --model-path ./outputs/llama_stage1_freezed_backbone/checkpoint-epoch-3 \
-    --model-base meta-llama/Llama-3.1-8B-Instruct \
+    --model-path ./outputs/olmo7b_tiny_stage1/best_model \
     --question-file $ROOT/question.json \
     --answer-file $ROOT/answer.json \
     --num-chunks 1 \
     --chunk-idx 0 \
-    --temperature 0 \
+    --temperature 0.7 \
     --conv-mode llama_3 \
     --input_type mel \
     --mel_size 80

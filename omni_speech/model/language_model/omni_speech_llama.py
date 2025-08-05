@@ -135,11 +135,14 @@ class OmniSpeechLlamaForCausalLM(LlamaForCausalLM, OmniSpeechMetaForCausalLM):
         else:
             inputs_embeds = self.get_model().embed_tokens(inputs)
 
+        # Filter out parameters not supported by the base generate method
+        filtered_kwargs = {k: v for k, v in kwargs.items() if k not in ['streaming_unit_gen']}
+        
         return super().generate(
             position_ids=position_ids,
             attention_mask=attention_mask,
             inputs_embeds=inputs_embeds,
-            **kwargs
+            **filtered_kwargs
         )
 
     def prepare_inputs_for_generation(self, input_ids, past_key_values=None,

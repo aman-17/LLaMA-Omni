@@ -68,3 +68,7 @@ class TrainingArguments(transformers.TrainingArguments):
     lora_bias: str = "none"
     speech_projector_lr: Optional[float] = None
     group_by_modality_length: bool = field(default=False)
+    micro_batch_size: Optional[int] = field(
+        default=None,
+        metadata={"help": "Micro batch size for gradient accumulation to reduce memory usage."}
+    )
