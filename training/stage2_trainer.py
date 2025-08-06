@@ -1,26 +1,32 @@
+import logging
 import os
+from typing import Dict, Optional
+
 import torch
 import torch.nn as nn
 import torch.nn.functional as F
-from torch.optim import AdamW
-from transformers import get_cosine_schedule_with_warmup
-import logging
-from tqdm import tqdm
-from typing import Dict, Optional
-import wandb
-from omni_speech.model.language_model.omni_speech2s_llama import OmniSpeech2SLlamaForCausalLM
-from omni_speech.model.builder import load_pretrained_model
-from omni_speech.arguments import ModelArguments, DataArguments, TrainingArguments
 from data_utils import create_data_loader
+from omni_speech.arguments import DataArguments, ModelArguments, TrainingArguments
+from omni_speech.model.builder import load_pretrained_model
+from omni_speech.model.language_model.omni_speech2s_llama import (
+    OmniSpeech2SLlamaForCausalLM,
+)
+from torch.optim import AdamW
+from tqdm import tqdm
+from transformers import get_cosine_schedule_with_warmup
+
+import wandb
 
 
 class CTCLoss(nn.Module):
-    def __init__(self, blank_idx: int = 0, reduction: str = 'mean'):
+    def __init__(self, blank_idx: int = 0, reduction: str = "mean"):
         super().__init__()
         self.blank_idx = blank_idx
         self.reduction = reduction
-        self.ctc_loss = nn.CTCLoss(blank=blank_idx, reduction=reduction, zero_infinity=True)
-    
+        self.ctc_loss = nn.CTCLoss(
+            blank=blank_idx, reduction=reduction, zero_infinity=True
+        )
+
     def forward(self, log_probs, targets, input_lengths, target_lengths):
         """
         Args:
@@ -31,32 +37,38 @@ class CTCLoss(nn.Module):
         """
         # CTC expects (max_time, batch_size, vocab_size)
         log_probs = log_probs.transpose(0, 1)
-        
+
         # Flatten targets and remove padding (-1)
         targets_flat = []
         target_lengths_clean = []
-        
+
         for i, target_len in enumerate(target_lengths):
             target = targets[i][:target_len]
             # Remove padding tokens (-1)
             target = target[target != -1]
             targets_flat.extend(target.tolist())
             target_lengths_clean.append(len(target))
-        
-        targets_flat = torch.tensor(targets_flat, dtype=torch.long, device=log_probs.device)
-        target_lengths_clean = torch.tensor(target_lengths_clean, dtype=torch.long, device=log_probs.device)
-        
-        return self.ctc_loss(log_probs, targets_flat, input_lengths, target_lengths_clean)
+
+        targets_flat = torch.tensor(
+            targets_flat, dtype=torch.long, device=log_probs.device
+        )
+        target_lengths_clean = torch.tensor(
+            target_lengths_clean, dtype=torch.long, device=log_probs.device
+        )
+
+        return self.ctc_loss(
+            log_probs, targets_flat, input_lengths, target_lengths_clean
+        )
 
 
-class Stage2Trainer:    
+class Stage2Trainer:
     def __init__(
         self,
         model_args: ModelArguments,
         data_args: DataArguments,
         training_args: TrainingArguments,
         stage1_model_path: str,
-        kmeans_model_path: str
+        kmeans_model_path: str,
     ):
         self.model_args = model_args
         self.data_args = data_args
@@ -65,40 +77,40 @@ class Stage2Trainer:
         logging.basicConfig(level=logging.INFO)
         self.logger = logging.getLogger(__name__)
         self.setup_model(stage1_model_path)
-        self.ctc_loss = CTCLoss(blank_idx=model_args.unit_vocab_size)  # Use vocab_size as blank
+        self.ctc_loss = CTCLoss(
+            blank_idx=model_args.unit_vocab_size
+        )  # Use vocab_size as blank
         self.setup_data_loaders()
         self.setup_optimizer_and_scheduler()
         if self.training_args.report_to == "wandb":
             wandb.init(
                 project="aolmo",
-                config={
-                    **vars(model_args),
-                    **vars(data_args),
-                    **vars(training_args)
-                }
+                config={**vars(model_args), **vars(data_args), **vars(training_args)},
             )
-    
+
     def setup_model(self, stage1_model_path: str):
         self.tokenizer, self.model, _ = load_pretrained_model(
             model_path=stage1_model_path,
             model_base=None,
-            s2s=True  # Load speech-to-speech version
+            s2s=True,  # Load speech-to-speech version
         )
-        
+
         # Freeze all components except speech decoder
         for name, param in self.model.named_parameters():
-            if 'speech_decoder' not in name and 'speech_generator' not in name:
+            if "speech_decoder" not in name and "speech_generator" not in name:
                 param.requires_grad = False
-        
+
         # Only train speech decoder
         for param in self.model.get_model().speech_generator.parameters():
             param.requires_grad = True
-        
-        self.logger.info(f"Model initialized. Trainable parameters: {self.count_trainable_params()}")
-    
+
+        self.logger.info(
+            f"Model initialized. Trainable parameters: {self.count_trainable_params()}"
+        )
+
     def count_trainable_params(self) -> int:
         return sum(p.numel() for p in self.model.parameters() if p.requires_grad)
-    
+
     def setup_data_loaders(self):
         self.train_loader = create_data_loader(
             data_path=self.data_args.data_path,
@@ -108,10 +120,13 @@ class Stage2Trainer:
             stage=2,
             kmeans_model_path=self.kmeans_model_path,
             num_workers=4,
-            shuffle=True
+            shuffle=True,
         )
-        
-        if hasattr(self.data_args, 'validation_data_path') and self.data_args.validation_data_path:
+
+        if (
+            hasattr(self.data_args, "validation_data_path")
+            and self.data_args.validation_data_path
+        ):
             self.val_loader = create_data_loader(
                 data_path=self.data_args.validation_data_path,
                 tokenizer=self.tokenizer,
@@ -120,151 +135,152 @@ class Stage2Trainer:
                 stage=2,
                 kmeans_model_path=self.kmeans_model_path,
                 num_workers=4,
-                shuffle=False
+                shuffle=False,
             )
         else:
             self.val_loader = None
-    
+
     def setup_optimizer_and_scheduler(self):
         # Only optimize speech decoder parameters
         trainable_params = [p for p in self.model.parameters() if p.requires_grad]
-        
+
         self.optimizer = AdamW(
-            trainable_params,
-            lr=2e-4,
-            weight_decay=self.training_args.weight_decay
+            trainable_params, lr=2e-4, weight_decay=self.training_args.weight_decay
         )
         total_steps = len(self.train_loader) * self.training_args.num_train_epochs
         warmup_steps = int(total_steps * 0.03)  # 3% warmup
-        
+
         self.scheduler = get_cosine_schedule_with_warmup(
             self.optimizer,
             num_warmup_steps=warmup_steps,
-            num_training_steps=total_steps
+            num_training_steps=total_steps,
         )
-    
+
     def forward_step(self, batch: Dict) -> Dict:
         for key in batch:
             if isinstance(batch[key], torch.Tensor):
                 batch[key] = batch[key].to(self.model.device)
-        
+
         # Forward pass through LLM (frozen) to get hidden states
         with torch.no_grad():
             llm_outputs = self.model(
-                input_ids=batch['input_ids'],
-                attention_mask=batch['attention_mask'],
-                speech=batch['speech_features'],
-                speech_lengths=batch['speech_lengths'],
-                output_hidden_states=True
+                input_ids=batch["input_ids"],
+                attention_mask=batch["attention_mask"],
+                speech=batch["speech_features"],
+                speech_lengths=batch["speech_lengths"],
+                output_hidden_states=True,
             )
-        
+
         # Get hidden states for speech generation
         hidden_states = llm_outputs.hidden_states[-1]  # Last layer hidden states
-        
+
         # Generate speech units using speech decoder
         speech_outputs = self.model.get_model().speech_generator(
-            hidden_states=hidden_states,
-            attention_mask=batch['attention_mask']
+            hidden_states=hidden_states, attention_mask=batch["attention_mask"]
         )
         log_probs = F.log_softmax(speech_outputs.logits, dim=-1)
-        
+
         # Get sequence lengths for CTC
-        input_lengths = batch['attention_mask'].sum(dim=1)
-        target_lengths = batch['unit_lengths']
-        
+        input_lengths = batch["attention_mask"].sum(dim=1)
+        target_lengths = batch["unit_lengths"]
+
         ctc_loss = self.ctc_loss(
             log_probs=log_probs,
-            targets=batch['speech_units'],
+            targets=batch["speech_units"],
             input_lengths=input_lengths,
-            target_lengths=target_lengths
+            target_lengths=target_lengths,
         )
-        
+
         return {
-            'loss': ctc_loss * self.model_args.ctc_loss_weight,
-            'logits': speech_outputs.logits,
-            'ctc_loss': ctc_loss
+            "loss": ctc_loss * self.model_args.ctc_loss_weight,
+            "logits": speech_outputs.logits,
+            "ctc_loss": ctc_loss,
         }
-    
+
     def train_epoch(self, epoch: int) -> Dict:
         """Train one epoch"""
         self.model.train()
-        
+
         # Keep frozen components in eval mode
         self.model.get_model().speech_encoder.eval()
         self.model.get_model().speech_projector.eval()
         self.model.get_model().model.eval()
-        
+
         total_loss = 0
         total_ctc_loss = 0
         num_batches = 0
-        
+
         progress_bar = tqdm(self.train_loader, desc=f"Epoch {epoch}")
-        
+
         for batch_idx, batch in enumerate(progress_bar):
             # Skip empty batches or batches without speech units
-            if not batch or 'speech_units' not in batch:
+            if not batch or "speech_units" not in batch:
                 continue
-            
+
             self.optimizer.zero_grad()
             outputs = self.forward_step(batch)
-            loss = outputs['loss']
-            ctc_loss = outputs['ctc_loss']
+            loss = outputs["loss"]
+            ctc_loss = outputs["ctc_loss"]
             loss.backward()
             if self.training_args.max_grad_norm > 0:
                 torch.nn.utils.clip_grad_norm_(
-                    [p for p in self.model.parameters() if p.requires_grad], 
-                    self.training_args.max_grad_norm
+                    [p for p in self.model.parameters() if p.requires_grad],
+                    self.training_args.max_grad_norm,
                 )
-            
+
             self.optimizer.step()
             self.scheduler.step()
             total_loss += loss.item()
             total_ctc_loss += ctc_loss.item()
             num_batches += 1
-            progress_bar.set_postfix({
-                'loss': f"{loss.item():.4f}",
-                'ctc_loss': f"{ctc_loss.item():.4f}",
-                'avg_loss': f"{total_loss / num_batches:.4f}",
-                'lr': f"{self.scheduler.get_last_lr()[0]:.2e}"
-            })
+            progress_bar.set_postfix(
+                {
+                    "loss": f"{loss.item():.4f}",
+                    "ctc_loss": f"{ctc_loss.item():.4f}",
+                    "avg_loss": f"{total_loss / num_batches:.4f}",
+                    "lr": f"{self.scheduler.get_last_lr()[0]:.2e}",
+                }
+            )
             if self.training_args.report_to == "wandb" and batch_idx % 10 == 0:
-                wandb.log({
-                    'train_loss': loss.item(),
-                    'train_ctc_loss': ctc_loss.item(),
-                    'learning_rate': self.scheduler.get_last_lr()[0],
-                    'epoch': epoch,
-                    'step': epoch * len(self.train_loader) + batch_idx
-                })
-        
+                wandb.log(
+                    {
+                        "train_loss": loss.item(),
+                        "train_ctc_loss": ctc_loss.item(),
+                        "learning_rate": self.scheduler.get_last_lr()[0],
+                        "epoch": epoch,
+                        "step": epoch * len(self.train_loader) + batch_idx,
+                    }
+                )
+
         return {
-            'train_loss': total_loss / num_batches if num_batches > 0 else 0,
-            'train_ctc_loss': total_ctc_loss / num_batches if num_batches > 0 else 0
+            "train_loss": total_loss / num_batches if num_batches > 0 else 0,
+            "train_ctc_loss": total_ctc_loss / num_batches if num_batches > 0 else 0,
         }
-    
+
     def validate(self) -> Dict:
         if self.val_loader is None:
             return {}
-        
+
         self.model.eval()
         total_loss = 0
         total_ctc_loss = 0
         num_batches = 0
-        
+
         with torch.no_grad():
             for batch in tqdm(self.val_loader, desc="Validation"):
-                if not batch or 'speech_units' not in batch:
+                if not batch or "speech_units" not in batch:
                     continue
-                
+
                 outputs = self.forward_step(batch)
-                total_loss += outputs['loss'].item()
-                total_ctc_loss += outputs['ctc_loss'].item()
+                total_loss += outputs["loss"].item()
+                total_ctc_loss += outputs["ctc_loss"].item()
                 num_batches += 1
-        
+
         return {
-            'val_loss': total_loss / num_batches if num_batches > 0 else 0,
-            'val_ctc_loss': total_ctc_loss / num_batches if num_batches > 0 else 0
+            "val_loss": total_loss / num_batches if num_batches > 0 else 0,
+            "val_ctc_loss": total_ctc_loss / num_batches if num_batches > 0 else 0,
         }
-    
+
     def save_checkpoint(self, epoch: int, output_dir: str):
         os.makedirs(output_dir, exist_ok=True)
         checkpoint_path = os.path.join(output_dir, f"checkpoint-epoch-{epoch}")
@@ -275,50 +291,59 @@ class Stage2Trainer:
         speech_decoder_state = self.model.get_model().speech_generator.state_dict()
         torch.save(speech_decoder_state, speech_decoder_path)
         training_state = {
-            'epoch': epoch,
-            'optimizer': self.optimizer.state_dict(),
-            'scheduler': self.scheduler.state_dict(),
-            'model_args': self.model_args,
-            'data_args': self.data_args,
-            'training_args': self.training_args
+            "epoch": epoch,
+            "optimizer": self.optimizer.state_dict(),
+            "scheduler": self.scheduler.state_dict(),
+            "model_args": self.model_args,
+            "data_args": self.data_args,
+            "training_args": self.training_args,
         }
         torch.save(training_state, os.path.join(checkpoint_path, "training_state.pt"))
-        
+
         self.logger.info(f"Checkpoint saved to {checkpoint_path}")
-    
+
     def train(self):
         self.logger.info("Starting Stage 2 training...")
         self.logger.info(f"Total epochs: {self.training_args.num_train_epochs}")
-        self.logger.info(f"Batch size: {self.training_args.per_device_train_batch_size}")
+        self.logger.info(
+            f"Batch size: {self.training_args.per_device_train_batch_size}"
+        )
         self.logger.info(f"Learning rate: 2e-4")
-        
-        best_val_loss = float('inf')
-        
+
+        best_val_loss = float("inf")
+
         for epoch in range(1, self.training_args.num_train_epochs + 1):
             train_metrics = self.train_epoch(epoch)
             val_metrics = self.validate()
-            self.logger.info(f"Epoch {epoch}: Train Loss = {train_metrics['train_loss']:.4f}, "
-                           f"Train CTC Loss = {train_metrics['train_ctc_loss']:.4f}")
+            self.logger.info(
+                f"Epoch {epoch}: Train Loss = {train_metrics['train_loss']:.4f}, "
+                f"Train CTC Loss = {train_metrics['train_ctc_loss']:.4f}"
+            )
             if val_metrics:
-                self.logger.info(f"Epoch {epoch}: Val Loss = {val_metrics['val_loss']:.4f}, "
-                               f"Val CTC Loss = {val_metrics['val_ctc_loss']:.4f}")
-            
+                self.logger.info(
+                    f"Epoch {epoch}: Val Loss = {val_metrics['val_loss']:.4f}, "
+                    f"Val CTC Loss = {val_metrics['val_ctc_loss']:.4f}"
+                )
+
             if self.training_args.report_to == "wandb":
-                wandb.log({
-                    **train_metrics,
-                    **val_metrics,
-                    'epoch': epoch
-                })
-            if epoch % self.training_args.save_steps == 0 or epoch == self.training_args.num_train_epochs:
+                wandb.log({**train_metrics, **val_metrics, "epoch": epoch})
+            if (
+                epoch % self.training_args.save_steps == 0
+                or epoch == self.training_args.num_train_epochs
+            ):
                 self.save_checkpoint(epoch, self.training_args.output_dir)
-            if val_metrics and val_metrics['val_loss'] < best_val_loss:
-                best_val_loss = val_metrics['val_loss']
-                best_model_path = os.path.join(self.training_args.output_dir, "best_model")
+            if val_metrics and val_metrics["val_loss"] < best_val_loss:
+                best_val_loss = val_metrics["val_loss"]
+                best_model_path = os.path.join(
+                    self.training_args.output_dir, "best_model"
+                )
                 self.save_checkpoint(epoch, best_model_path)
-                self.logger.info(f"New best model saved with val_loss: {best_val_loss:.4f}")
-        
+                self.logger.info(
+                    f"New best model saved with val_loss: {best_val_loss:.4f}"
+                )
+
         self.logger.info("Stage 2 training completed!")
         final_model_path = os.path.join(self.training_args.output_dir, "final_model")
         self.save_checkpoint(self.training_args.num_train_epochs, final_model_path)
-        
+
         return self.model
