@@ -14,13 +14,10 @@
 #    limitations under the License.
 
 import os
-import shutil
-import warnings
 
 import torch
 from transformers import (
     AutoConfig,
-    AutoModelForCausalLM,
     AutoTokenizer,
     BitsAndBytesConfig,
 )
@@ -56,7 +53,7 @@ def load_pretrained_model(
             bnb_4bit_quant_type="nf4",
         )
     else:
-        kwargs["torch_dtype"] = torch.float16
+        kwargs["torch_dtype"] = torch.float32
 
     if use_flash_attn:
         kwargs["attn_implementation"] = "flash_attention_2"
@@ -132,24 +129,52 @@ def load_pretrained_model(
         )
         model = model.to(device=device)
 
-    # if model_args:
-    #     if hasattr(model_args, 'speech_encoder') and model_args.speech_encoder:
-    #         model.config.speech_encoder = model_args.speech_encoder
-    #     elif not hasattr(model.config, 'speech_encoder'):
-    #         model.config.speech_encoder = "tiny.en"
+    if model_args:
+        if hasattr(model_args, 'speech_encoder') and model_args.speech_encoder:
+            model.config.speech_encoder = model_args.speech_encoder
+        elif not hasattr(model.config, 'speech_encoder'):
+            model.config.speech_encoder = "large-v3"
 
-    #     if hasattr(model_args, 'speech_encoder_type') and model_args.speech_encoder_type:
-    #         model.config.speech_encoder_type = model_args.speech_encoder_type
-    #     elif not hasattr(model.config, 'speech_encoder_type'):
-    #         model.config.speech_encoder_type = "whisper"
-    # else:
-    #     if not hasattr(model.config, 'speech_encoder'):
-    #         model.config.speech_encoder = "tiny.en"
-    #     if not hasattr(model.config, 'speech_encoder_type'):
-    #         model.config.speech_encoder_type = "whisper"
+        if hasattr(model_args, 'speech_encoder_type') and model_args.speech_encoder_type:
+            model.config.speech_encoder_type = model_args.speech_encoder_type
+        elif not hasattr(model.config, 'speech_encoder_type'):
+            model.config.speech_encoder_type = "whisper"
+            
+        if hasattr(model_args, 'speech_encoder_hidden_size') and model_args.speech_encoder_hidden_size:
+            model.config.speech_encoder_hidden_size = model_args.speech_encoder_hidden_size
+        elif not hasattr(model.config, 'speech_encoder_hidden_size'):
+            model.config.speech_encoder_hidden_size = 1280
+            
+        if hasattr(model_args, 'speech_projector_type') and model_args.speech_projector_type:
+            model.config.speech_projector_type = model_args.speech_projector_type
+        elif not hasattr(model.config, 'speech_projector_type'):
+            model.config.speech_projector_type = "linear"
+            
+        if hasattr(model_args, 'speech_encoder_ds_rate') and model_args.speech_encoder_ds_rate:
+            model.config.speech_encoder_ds_rate = model_args.speech_encoder_ds_rate
+        elif not hasattr(model.config, 'speech_encoder_ds_rate'):
+            model.config.speech_encoder_ds_rate = 5
+    else:
+        if not hasattr(model.config, 'speech_encoder'):
+            model.config.speech_encoder = "large-v3"
+        if not hasattr(model.config, 'speech_encoder_type'):
+            model.config.speech_encoder_type = "whisper"
+        if not hasattr(model.config, 'speech_encoder_hidden_size'):
+            model.config.speech_encoder_hidden_size = 1280
+        if not hasattr(model.config, 'speech_projector_type'):
+            model.config.speech_projector_type = "linear"
+        if not hasattr(model.config, 'speech_encoder_ds_rate'):
+            model.config.speech_encoder_ds_rate = 5
 
     model.get_model().speech_encoder = build_speech_encoder(model.config)
-    model.get_model().speech_encoder.to(device=device, dtype=torch.float16)
+    # Detect the model's dtype and use it for speech components
+    model_dtype = next(model.parameters()).dtype
+    model.get_model().speech_encoder.to(device=device, dtype=model_dtype)
+    
+    if not hasattr(model.get_model(), 'speech_projector') or model.get_model().speech_projector is None:
+        from .speech_projector.builder import build_speech_projector
+        model.get_model().speech_projector = build_speech_projector(model.config)
+        model.get_model().speech_projector.to(device=device, dtype=model_dtype)
 
     if hasattr(model.config, "max_position_embeddings"):
         context_len = model.config.max_position_embeddings

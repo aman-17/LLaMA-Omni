@@ -30,9 +30,8 @@ class Omni2SpeechMetaModel:
 
     def __init__(self, config):
         super(Omni2SpeechMetaModel, self).__init__(config)
-        if hasattr(config, "speech_encoder"):
-            self.speech_encoder = build_speech_encoder(config)
-            self.speech_projector = build_speech_projector(config)
+        # Don't initialize speech modules during model construction
+        # They will be initialized later by the builder or initialize_speech_modules
 
     def get_speech_encoder(self):
         speech_encoder = getattr(self, "speech_encoder", None)
@@ -59,8 +58,14 @@ class Omni2SpeechMetaModel:
 
         if self.get_speech_encoder() is None:
             self.speech_encoder = build_speech_encoder(self.config)
+            # Use the same dtype as the main model
+            model_dtype = next(self.parameters()).dtype
+            self.speech_encoder.to(dtype=model_dtype)
         if self.get_speech_projector() is None:
             self.speech_projector = build_speech_projector(self.config)
+            # Use the same dtype as the main model
+            model_dtype = next(self.parameters()).dtype
+            self.speech_projector.to(dtype=model_dtype)
 
 
 class Omni2SpeechMetaForCausalLM(ABC):
@@ -79,6 +84,9 @@ class Omni2SpeechMetaForCausalLM(ABC):
         speech_encoder_type = self.config.speech_encoder_type
         speech_encoder = self.get_speech_encoder()
         if "whisper" in speech_encoder_type.lower():
+            # Ensure speech tensor matches the speech encoder's dtype
+            speech_encoder_dtype = next(speech_encoder.parameters()).dtype
+            speech = speech.to(dtype=speech_encoder_dtype)
             encoder_outs = speech_encoder(speech.permute(0, 2, 1))
             speech_lengths = (speech_lengths + 1) // 2
         else:

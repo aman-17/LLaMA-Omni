@@ -20,11 +20,11 @@ from typing import List, Optional, Tuple, Union
 
 import torch
 import torch.nn as nn
-from omni_speech.model.language_model.omni2_speech_olmo2 import (
+from olmo_omni.model.language_model.omni2_speech_olmo2 import (
     Omni2SpeechOlmo2ForCausalLM,
 )
-from omni_speech.model.speech_generator.builder import build_speech_generator
-from omni_speech.model.speech_generator.generation import GenerationWithTTS
+from olmo_omni.model.speech_generator.builder import build_speech_generator
+from olmo_omni.model.speech_generator.generation import GenerationWithTTS
 from transformers import AutoConfig, AutoModelForCausalLM, Olmo2Config
 from transformers.generation.utils import GenerateOutput
 from transformers.modeling_outputs import CausalLMOutputWithPast

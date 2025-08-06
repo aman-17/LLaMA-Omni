@@ -118,7 +118,7 @@ def preprocess_olmo2(
             else tokenizer.eos_token_id
         )
         total_len = int(target.ne(pad_token_id).sum())
-        assistant_start = f"<|im_start|>{conv.roles[1]}\n"
+        assistant_start = f"<|assistant|>\n"
         conversation_parts = conversation.split(assistant_start)
 
         if len(conversation_parts) >= 2:

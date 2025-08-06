@@ -11,9 +11,9 @@ import soundfile as sf
 import torch
 import torchaudio
 from fairseq.models.text_to_speech.vocoder import CodeHiFiGANVocoder
-from omni_speech.constants import LOGDIR
-from omni_speech.conversation import conv_templates, default_conversation
-from omni_speech.utils import build_logger, server_error_msg
+from olmo_omni.constants import LOGDIR
+from olmo_omni.conversation import conv_templates, default_conversation
+from olmo_omni.utils import build_logger, server_error_msg
 
 logger = build_logger("gradio_web_server", "gradio_web_server.log")
 

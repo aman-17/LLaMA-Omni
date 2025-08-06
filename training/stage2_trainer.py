@@ -6,10 +6,10 @@ import torch
 import torch.nn as nn
 import torch.nn.functional as F
 from data_utils import create_data_loader
-from omni_speech.arguments import DataArguments, ModelArguments, TrainingArguments
-from omni_speech.model.builder import load_pretrained_model
-from omni_speech.model.language_model.omni_speech2s_llama import (
-    OmniSpeech2SLlamaForCausalLM,
+from olmo_omni.arguments import DataArguments, ModelArguments, TrainingArguments
+from olmo_omni.model.builder import load_pretrained_model
+from olmo_omni.model.language_model.omni2_speech2s_olmo2 import (
+    Omni2SpeechOlmo2ForCausalLM,
 )
 from torch.optim import AdamW
 from tqdm import tqdm

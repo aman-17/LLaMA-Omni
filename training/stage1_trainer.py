@@ -63,7 +63,6 @@ class Stage1Trainer:
                             **vars(data_args),
                             **vars(training_args),
                         },
-                        reinit=True,
                     )
                     self.logger.info(f"Initialized wandb run: {wandb.run.url}")
                 except Exception as e:

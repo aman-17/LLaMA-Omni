@@ -18,14 +18,14 @@ import uvicorn
 import whisper
 from fastapi import BackgroundTasks, FastAPI, Request
 from fastapi.responses import StreamingResponse
-from omni_speech.constants import (
+from olmo_omni.constants import (
     DEFAULT_SPEECH_TOKEN,
     SPEECH_TOKEN_INDEX,
     WORKER_HEART_BEAT_INTERVAL,
 )
-from omni_speech.datasets.preprocess import tokenizer_speech_token
-from omni_speech.model.builder import load_pretrained_model
-from omni_speech.utils import build_logger, pretty_print_semaphore, server_error_msg
+from olmo_omni.datasets.preprocess import tokenizer_speech_token
+from olmo_omni.model.builder import load_pretrained_model
+from olmo_omni.utils import build_logger, pretty_print_semaphore, server_error_msg
 from transformers import PreTrainedTokenizer, TextIteratorStreamer
 
 GB = 1 << 30

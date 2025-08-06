@@ -7,7 +7,7 @@ import json
 import os
 from typing import Dict, List, Optional
 
-import fairseq
+# import fairseq
 import joblib
 import librosa
 import numpy as np

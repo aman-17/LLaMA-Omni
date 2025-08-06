@@ -91,14 +91,14 @@ def create_data_loader(questions, tokenizer, model_config, batch_size=1, num_wor
 
 
 def load_pretrained_model(model_path, s2s=False):
-    model_cls = Omni2Speech2SOlmo2ForCausalLM if s2s else Omni2SpeechOlmo2ForCausalLM
-    config = AutoConfig.from_pretrained(model_path)
-    config.tts_tokenizer = os.path.join(model_path, "tts_tokenizer")
-    tokenizer = AutoTokenizer.from_pretrained(model_path, use_fast=False)
-    model = model_cls.from_pretrained(
-        model_path, config=config, torch_dtype=torch.bfloat16
+    from olmo_omni.model.builder import load_pretrained_model as load_model
+    tokenizer, model, _ = load_model(
+        model_path=model_path,
+        model_base=None,
+        s2s=s2s,
+        device="cuda",
+        model_args=None
     )
-    model.cuda()
     return tokenizer, model
 
 
