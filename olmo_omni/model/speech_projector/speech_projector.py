@@ -29,73 +29,66 @@ class EncoderProjectorConcat(nn.Module):
         x = self.linear2(x)
         return x
 
+class WeightedEncoderProjectorConcat(nn.Module):
+      def __init__(self, config):
+          super().__init__()
+          self.k = config.speech_encoder_ds_rate
+          self.encoder_dim = config.speech_encoder_hidden_size
+          self.temporal_weights = nn.Parameter(torch.ones(self.k) / self.k)
+          self.softmax = nn.Softmax(dim=-1)
+          self.linear1 = nn.Linear(self.encoder_dim * self.k, 2048)
+          self.linear2 = nn.Linear(2048, config.hidden_size)
+          self.residual = nn.Linear(self.encoder_dim, config.hidden_size)
 
-class ConvAttentionProjector(nn.Module):
+      def forward(self, x):
+          batch_size, seq_len, dim = x.size()
+          # Truncate to multiple of k
+          x = x[:, :seq_len - (seq_len % self.k), :]
+          seq_len = x.size(1)
+          x_reshaped = x.view(batch_size, seq_len // self.k, self.k, dim)
+          weights = self.softmax(self.temporal_weights).unsqueeze(0).unsqueeze(0).unsqueeze(-1)
+          x_weighted = (x_reshaped * weights).view(batch_size, seq_len // self.k, dim * self.k)
+          main_path = self.linear2(F.relu(self.linear1(x_weighted)))
+          center_frame = x_reshaped[:, :, self.k//2, :]
+          residual_path = self.residual(center_frame)
+          return main_path + 0.1 * residual_path
+
+
+class SpectralEncoderProjectorConcat(nn.Module):
     def __init__(self, config):
         super().__init__()
-        self.encoder_dim = config.speech_encoder_hidden_size
-        self.llm_dim = config.hidden_size
-        self.compression_ratio = config.speech_encoder_ds_rate
-        self.conv1d = nn.Conv1d(
-            self.encoder_dim,
-            self.encoder_dim,
-            kernel_size=self.compression_ratio,
-            stride=self.compression_ratio,
-            padding=0,
-        )
-        self.attention = nn.MultiheadAttention(
-            self.encoder_dim, num_heads=8, batch_first=True
-        )
-        self.norm = nn.LayerNorm(self.encoder_dim)
-        self.projector = nn.Linear(self.encoder_dim, self.llm_dim)
-
-    def forward(self, x):
-        # x: [batch, seq_len, dim]
-        x = x.transpose(1, 2)  # [batch, dim, seq_len]
-        x = self.conv1d(x)  # Temporal compression
-        x = x.transpose(1, 2)  # [batch, compressed_seq, dim]
-        attn_out, _ = self.attention(x, x, x)
-        x = self.norm(x + attn_out)
-        return self.projector(x)
-
-
-class HierarchicalPoolingProjector(nn.Module):
-    def __init__(self, config):
-        super().__init__()
-        self.encoder_dim = config.speech_encoder_hidden_size
-        self.llm_dim = config.hidden_size
         self.k = config.speech_encoder_ds_rate
-        self.avg_pool = nn.AdaptiveAvgPool1d(1)
-        self.max_pool = nn.AdaptiveMaxPool1d(1)
-        self.attention_pool = nn.Sequential(
-            nn.Linear(self.encoder_dim, 1), nn.Softmax(dim=1)
-        )
-        self.combine = nn.Linear(self.encoder_dim * 3, self.encoder_dim)
+        self.encoder_dim = config.speech_encoder_hidden_size
+        self.register_buffer('dct_basis', self._get_dct_basis(self.k))
+        self.freq_selector = nn.Linear(self.encoder_dim, self.k)
+        self.sigmoid = nn.Sigmoid()
         self.projector = nn.Sequential(
-            nn.Linear(self.encoder_dim, self.encoder_dim * 2),
-            nn.GELU(),
-            nn.Dropout(0.1),
-            nn.Linear(self.encoder_dim * 2, self.llm_dim),
+            nn.Linear(self.encoder_dim * self.k, 2048),
+            nn.ReLU(),
+            nn.Linear(2048, config.hidden_size)
         )
+    def _get_dct_basis(self, k):
+        basis = torch.zeros(k, k)
+        for i in range(k):
+            for j in range(k):
+                if i == 0:
+                    basis[i, j] = 1.0 / math.sqrt(k)
+                else:
+                    basis[i, j] = math.sqrt(2.0/k) * math.cos(math.pi * i * (2*j + 1) / (2*k))
+        return basis
 
     def forward(self, x):
         batch_size, seq_len, dim = x.size()
-        num_chunks = seq_len // self.k
-        if seq_len % self.k != 0:
-            x = x[:, : num_chunks * self.k, :]
-        x_chunks = x.view(batch_size, num_chunks, self.k, dim)
-        avg_pooled = x_chunks.mean(dim=2)  # [batch, num_chunks, dim]
-        max_pooled = x_chunks.max(dim=2)[0]
-        attention_weights = self.attention_pool(
-            x_chunks.view(batch_size * num_chunks, self.k, dim)
-        )
-        attention_pooled = (
-            x_chunks.view(batch_size * num_chunks, self.k, dim) * attention_weights
-        ).sum(dim=1)
-        attention_pooled = attention_pooled.view(batch_size, num_chunks, dim)
-        combined = torch.cat([avg_pooled, max_pooled, attention_pooled], dim=-1)
-        compressed = self.combine(combined)
-        return self.projector(compressed)
+        x = x[:, :seq_len - (seq_len % self.k), :]
+        seq_len = x.size(1)
+        x_windows = x.view(batch_size, seq_len // self.k, self.k, dim)
+        x_freq = torch.matmul(x_windows, self.dct_basis.T)  # [B, W, k, D]
+        freq_weights = self.sigmoid(self.freq_selector(x_freq.mean(dim=2)))  # [B, W, k]
+        x_freq_weighted = x_freq * freq_weights.unsqueeze(-1)
+        x_time = torch.matmul(x_freq_weighted, self.dct_basis)
+        x_concat = x_time.view(batch_size, seq_len // self.k, dim * self.k)
+
+        return self.projector(x_concat)
 
 
 class LearnableTokenCompressor(nn.Module):
@@ -128,63 +121,6 @@ class LearnableTokenCompressor(nn.Module):
         ffn_out = self.ffn(compressed)
         compressed = self.norm2(compressed + ffn_out)
         return self.projector(compressed)
-
-
-class HiggsStyleAudioProjector(nn.Module):
-    def __init__(self, config):
-        super().__init__()
-        self.encoder_dim = config.speech_encoder_hidden_size
-        self.llm_dim = config.hidden_size
-        self.k = config.speech_encoder_ds_rate
-        self.linear = nn.Linear(self.encoder_dim, self.llm_dim, bias=True)
-
-        self.use_compression = getattr(config, "compress_speech_tokens", False)
-        if self.use_compression:
-            self.compression_type = getattr(
-                config, "compression_type", "attention_pool"
-            )
-
-            if self.compression_type == "attention_pool":
-                self.attention_pool = nn.MultiheadAttention(
-                    self.llm_dim, num_heads=8, batch_first=True
-                )
-                self.query_tokens = nn.Parameter(
-                    torch.randn(1, config.max_speech_tokens // self.k, self.llm_dim)
-                )
-            elif self.compression_type == "conv_pool":
-                self.conv_compress = nn.Conv1d(
-                    self.llm_dim,
-                    self.llm_dim,
-                    kernel_size=self.k,
-                    stride=self.k,
-                    padding=0,
-                )
-            elif self.compression_type == "adaptive_pool":
-                self.adaptive_pool = nn.AdaptiveAvgPool1d(
-                    config.max_speech_tokens // self.k
-                )
-
-    def forward(self, x):
-        projected = self.linear(x)  # [batch, seq_len, llm_dim]
-        if not self.use_compression:
-            return projected
-        if self.compression_type == "attention_pool":
-            batch_size = x.size(0)
-            query_tokens = self.query_tokens.expand(batch_size, -1, -1)
-            compressed, _ = self.attention_pool(query_tokens, projected, projected)
-            return compressed
-
-        elif self.compression_type == "conv_pool":
-            x_conv = projected.transpose(1, 2)  # [batch, llm_dim, seq_len]
-            compressed = self.conv_compress(x_conv).transpose(1, 2)
-            return compressed
-
-        elif self.compression_type == "adaptive_pool":
-            x_pool = projected.transpose(1, 2)  # [batch, llm_dim, seq_len]
-            compressed = self.adaptive_pool(x_pool).transpose(1, 2)
-            return compressed
-
-        return projected
 
 
 class MultiScaleAudioProjector(nn.Module):

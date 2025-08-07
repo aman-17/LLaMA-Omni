@@ -167,7 +167,6 @@ def load_pretrained_model(
             model.config.speech_encoder_ds_rate = 5
 
     model.get_model().speech_encoder = build_speech_encoder(model.config)
-    # Detect the model's dtype and use it for speech components
     model_dtype = next(model.parameters()).dtype
     model.get_model().speech_encoder.to(device=device, dtype=model_dtype)
     

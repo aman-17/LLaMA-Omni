@@ -215,7 +215,7 @@ class Stage1Trainer:
         )
 
         total_steps = len(self.train_loader) * self.training_args.num_train_epochs
-        warmup_steps = int(total_steps * 0.03)
+        warmup_steps = int(total_steps * 0.02)
 
         self.scheduler = get_linear_schedule_with_warmup(
             self.optimizer,

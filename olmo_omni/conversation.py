@@ -33,8 +33,6 @@ class Conversation:
 
         if self.sep_style == SeparatorStyle.OLMO2:
             ret = "<|endoftext|>"
-            if self.system:
-                ret += f"<|system|>\n{self.system}\n"
             for i, (role, message) in enumerate(messages):
                 if message:
                     if type(message) is tuple:
@@ -106,9 +104,7 @@ class Conversation:
 
 
 conv_olmo2 = Conversation(
-    system="You are a helpful language and speech assistant. "
-    "You are able to understand the speech content that the user provides, "
-    "and assist the user with a variety of tasks using natural language.",
+    system="",
     roles=("user", "assistant"),
     version="olmo2",
     messages=[],
@@ -133,4 +129,8 @@ def set_default_conversation(template_name):
 
 
 if __name__ == "__main__":
-    print(default_conversation.get_prompt())
+    # print(default_conversation.get_prompt())
+    conv = default_conversation.copy()
+    conv.append_message("user", "<speech>\nWhat's in this audio?")
+    conv.append_message("assistant", None)
+    print(conv.get_prompt())

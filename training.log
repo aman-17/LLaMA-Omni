@@ -233,3 +233,70 @@ AttributeError: 'Olmo2Config' object has no attribute 'speech_encoder_ds_rate'. 
 2025-08-06 04:22:06,129 - stage1_trainer - INFO - Total epochs: 3
 2025-08-06 04:22:06,129 - stage1_trainer - INFO - Batch size: 16
 2025-08-06 04:22:06,129 - stage1_trainer - INFO - Learning rate: 4e-06
+2025-08-06 04:30:25,357 - stage1_trainer - INFO - Running validation at step 12000
+2025-08-06 05:59:16,488 - stage1_trainer - INFO - Step 12000: Val Loss = 1.7824
+2025-08-06 06:39:48,420 - stage1_trainer - INFO - Running validation at step 12500
+2025-08-06 08:07:19,237 - stage1_trainer - INFO - Step 12500: Val Loss = 1.3172
+2025-08-06 08:46:49,214 - stage1_trainer - INFO - Running validation at step 13000
+2025-08-06 10:13:58,787 - stage1_trainer - INFO - Step 13000: Val Loss = 1.2847
+2025-08-06 10:53:23,958 - stage1_trainer - INFO - Running validation at step 13500
+2025-08-06 12:20:34,359 - stage1_trainer - INFO - Step 13500: Val Loss = 1.2660
+2025-08-06 12:59:59,823 - stage1_trainer - INFO - Running validation at step 14000
+2025-08-06 14:27:01,973 - stage1_trainer - INFO - Step 14000: Val Loss = 1.2568
+2025-08-06 15:06:22,867 - stage1_trainer - INFO - Running validation at step 14500
+2025-08-06 16:33:29,972 - stage1_trainer - INFO - Step 14500: Val Loss = 1.2492
+2025-08-06 17:13:00,904 - stage1_trainer - INFO - Running validation at step 15000
+2025-08-06 18:41:08,339 - stage1_trainer - INFO - Step 15000: Val Loss = 1.2425
+2025-08-06 21:25:11,548 - __main__ - INFO - ==================================================
+2025-08-06 21:25:11,549 - __main__ - INFO - Audio OLMo Training
+2025-08-06 21:25:11,549 - __main__ - INFO - ==================================================
+2025-08-06 21:25:11,549 - __main__ - INFO - Stage: 1
+2025-08-06 21:25:11,549 - __main__ - INFO - Output directory: ./outputs/olmo1b_whisper_large_stage1
+2025-08-06 21:25:11,549 - __main__ - INFO - Data path: /data/input/amanr/LLaMA-Omni/InstructS2S-200K/instruct_en_train.json
+2025-08-06 21:25:11,549 - __main__ - INFO - Model: allenai/OLMo-2-0425-1B-Instruct
+2025-08-06 21:25:11,549 - __main__ - INFO - Epochs: 3
+2025-08-06 21:25:11,549 - __main__ - INFO - Batch size: 16
+2025-08-06 21:25:11,550 - __main__ - INFO - Learning rate: 4e-06
+2025-08-06 21:25:11,550 - __main__ - INFO - ==================================================
+2025-08-06 21:25:11,550 - __main__ - INFO - Distributed training: 2 processes
+2025-08-06 21:25:11,550 - __main__ - INFO - Local rank: 0
+2025-08-06 21:25:11,550 - __main__ - INFO - Using 2 GPU(s)
+2025-08-06 21:25:11,905 - __main__ - INFO - Starting Stage 1 training (Speech-to-Text)
+2025-08-06 21:27:15,769 - stage1_trainer - INFO - Model initialized. Trainable parameters: 17305600
+2025-08-06 21:30:59,889 - stage1_trainer - ERROR - Failed to initialize wandb: module 'wandb' has no attribute 'init'
+2025-08-06 21:30:59,889 - stage1_trainer - INFO - Starting Stage 1 training...
+2025-08-06 21:30:59,889 - stage1_trainer - INFO - Total epochs: 3
+2025-08-06 21:30:59,889 - stage1_trainer - INFO - Batch size: 16
+2025-08-06 21:30:59,889 - stage1_trainer - INFO - Learning rate: 4e-06
+2025-08-06 21:30:59,908 - __main__ - ERROR - Training failed with error: [Errno 2] No such file or directory: 'ffmpeg'
+2025-08-06 21:30:59,910 - __main__ - ERROR - Traceback (most recent call last):
+  File "/data/input/amanr/LLaMA-Omni/training/train.py", line 197, in main
+    trainer.train()
+  File "/data/input/amanr/LLaMA-Omni/training/stage1_trainer.py", line 504, in train
+    train_metrics = self.train_epoch(epoch)
+  File "/data/input/amanr/LLaMA-Omni/training/stage1_trainer.py", line 271, in train_epoch
+    for batch_idx, batch in enumerate(progress_bar):
+  File "/root/.conda/envs/au/lib/python3.10/site-packages/tqdm/std.py", line 1181, in __iter__
+    for obj in iterable:
+  File "/root/.conda/envs/au/lib/python3.10/site-packages/torch/utils/data/dataloader.py", line 631, in __next__
+    data = self._next_data()
+  File "/root/.conda/envs/au/lib/python3.10/site-packages/torch/utils/data/dataloader.py", line 675, in _next_data
+    data = self._dataset_fetcher.fetch(index)  # may raise StopIteration
+  File "/root/.conda/envs/au/lib/python3.10/site-packages/torch/utils/data/_utils/fetch.py", line 51, in fetch
+    data = [self.dataset[idx] for idx in possibly_batched_index]
+  File "/root/.conda/envs/au/lib/python3.10/site-packages/torch/utils/data/_utils/fetch.py", line 51, in <listcomp>
+    data = [self.dataset[idx] for idx in possibly_batched_index]
+  File "/data/input/amanr/LLaMA-Omni/training/data_utils.py", line 201, in __getitem__
+    speech_features = self.load_audio(speech_path)
+  File "/data/input/amanr/LLaMA-Omni/training/data_utils.py", line 153, in load_audio
+    audio = whisper.load_audio(audio_path)
+  File "/root/.conda/envs/au/lib/python3.10/site-packages/whisper/audio.py", line 58, in load_audio
+    out = run(cmd, capture_output=True, check=True).stdout
+  File "/root/.conda/envs/au/lib/python3.10/subprocess.py", line 503, in run
+    with Popen(*popenargs, **kwargs) as process:
+  File "/root/.conda/envs/au/lib/python3.10/subprocess.py", line 971, in __init__
+    self._execute_child(args, executable, preexec_fn, close_fds,
+  File "/root/.conda/envs/au/lib/python3.10/subprocess.py", line 1863, in _execute_child
+    raise child_exception_type(errno_num, err_msg, err_filename)
+FileNotFoundError: [Errno 2] No such file or directory: 'ffmpeg'
+

@@ -109,7 +109,18 @@ python llama_omni2/inference/run_cosy2_decoder.py \
     --input-path $output_dir/answers.jsonl \
     --output-dir $output_dir/wav \
     --lang en
+
+export PYTHONPATH="${PYTHONPATH}:$(pwd)"
+
+python olmo_omni/inference/run_llama_omni2.py \
+    --model_path outputs/olmo7b_tiny_stage1/best_model \
+    --question_file olmo_omni/examples/questions.json \
+    --answer_file olmo_omni/examples/answers.jsonl \
+    --temperature 0.5
+
 ```
+
+
 
 ## LICENSE
 
