@@ -364,6 +364,25 @@ class Stage1Trainer:
                         self.logger.warning(f"Failed to log to wandb: {e}")
 
             current_step = epoch * len(self.train_loader) + batch_idx
+            
+            # Step-based checkpointing
+            if (
+                self.rank == 0
+                and hasattr(self.training_args, "save_strategy")
+                and self.training_args.save_strategy == "steps"
+                and hasattr(self.training_args, "save_steps")
+                and self.training_args.save_steps > 0
+            ):
+                if (
+                    current_step > 0
+                    and current_step % self.training_args.save_steps == 0
+                ):
+                    self.logger.info(f"Saving checkpoint at step {current_step}")
+                    step_checkpoint_dir = os.path.join(
+                        self.training_args.output_dir, f"checkpoint-step-{current_step}"
+                    )
+                    self.save_checkpoint_with_name(step_checkpoint_dir)
+                    
             if (
                 hasattr(self.training_args, "eval_steps")
                 and self.training_args.eval_steps > 0
@@ -415,9 +434,7 @@ class Stage1Trainer:
 
         return {"val_loss": total_loss / num_batches if num_batches > 0 else 0}
 
-    def save_checkpoint(self, epoch: int, output_dir: str):
-        os.makedirs(output_dir, exist_ok=True)
-        checkpoint_path = os.path.join(output_dir, f"checkpoint-epoch-{epoch}")
+    def save_checkpoint_with_name(self, checkpoint_path: str):
         os.makedirs(checkpoint_path, exist_ok=True)
         model_to_save = self.model.module if self.is_distributed else self.model
 
@@ -449,6 +466,12 @@ class Stage1Trainer:
                 tokenizer_path = os.path.join(checkpoint_path, "tokenizer.bin")
                 torch.save(self.tokenizer.state_dict(), tokenizer_path)
 
+    def save_checkpoint(self, epoch: int, output_dir: str):
+        os.makedirs(output_dir, exist_ok=True)
+        checkpoint_path = os.path.join(output_dir, f"checkpoint-epoch-{epoch}")
+        self.save_checkpoint_with_name(checkpoint_path)
+
+        model_to_save = self.model.module if self.is_distributed else self.model
         if hasattr(model_to_save, "get_model") and hasattr(
             model_to_save.get_model(), "speech_projector"
         ):

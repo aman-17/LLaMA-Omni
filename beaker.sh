@@ -1,5 +1,5 @@
 sudo apt install -y ffmpeg
-cd /myfiles/amanr/LLaMA-Omni/
+#cd /myfiles/amanr/LLaMA-Omni/
 export PYTHONPATH="${PYTHONPATH}:$(pwd)"
 pip install -e .
 pip install ffmpeg

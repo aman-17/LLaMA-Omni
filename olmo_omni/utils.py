@@ -5,7 +5,7 @@ import sys
 
 import torch
 import transformers
-from llama_omni2.constants import LOGDIR
+from olmo_omni.constants import LOGDIR
 
 server_error_msg = (
     "**NETWORK ERROR DUE TO HIGH TRAFFIC. PLEASE REGENERATE OR REFRESH THIS PAGE.**"

@@ -1,22 +1,22 @@
 version: v2
-budget: ai2/oe-training
-description: Training AOLMo
+budget: ai2/oe-adapt
+description: Merge model
 retry:
-  allowedTaskRetries: 2
+  allowedTaskRetries: 1
 tasks:
-  - name: train-aolmo
+  - name: whole-fowl-ckhfje
     image:
       beaker: ai2/cuda11.8-ubuntu20.04
     command:
       - /bin/bash
       - -c
-      - /myfiles/amanr/LLaMA-Omni/beaker.sh
+      - /data/input/amanr/LLaMA-Omni/beaker.sh
     datasets:
-      - mountPath: /myfiles
+      - mountPath: /data/input
         source:
           weka: oe-training-default
     resources:
-      gpuCount: 8
+      gpuCount: 4
     context:
       preemptible: false
       priority: normal

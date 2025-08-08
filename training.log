@@ -300,3 +300,347 @@ AttributeError: 'Olmo2Config' object has no attribute 'speech_encoder_ds_rate'. 
     raise child_exception_type(errno_num, err_msg, err_filename)
 FileNotFoundError: [Errno 2] No such file or directory: 'ffmpeg'
 
+2025-08-07 01:13:48,945 - __main__ - INFO - ==================================================
+2025-08-07 01:13:48,945 - __main__ - INFO - Audio OLMo Training
+2025-08-07 01:13:48,945 - __main__ - INFO - ==================================================
+2025-08-07 01:13:48,945 - __main__ - INFO - Stage: 1
+2025-08-07 01:13:48,946 - __main__ - INFO - Output directory: ./outputs/olmo1b_whisper_large_stage1
+2025-08-07 01:13:48,946 - __main__ - INFO - Data path: /data/input/amanr/LLaMA-Omni/InstructS2S-200K/instruct_en_train.json
+2025-08-07 01:13:48,946 - __main__ - INFO - Model: allenai/OLMo-2-0425-1B-Instruct
+2025-08-07 01:13:48,946 - __main__ - INFO - Epochs: 3
+2025-08-07 01:13:48,946 - __main__ - INFO - Batch size: 16
+2025-08-07 01:13:48,946 - __main__ - INFO - Learning rate: 4e-06
+2025-08-07 01:13:48,946 - __main__ - INFO - ==================================================
+2025-08-07 01:13:48,946 - __main__ - INFO - Distributed training: 2 processes
+2025-08-07 01:13:48,946 - __main__ - INFO - Local rank: 0
+2025-08-07 01:13:48,946 - __main__ - INFO - Using 2 GPU(s)
+2025-08-07 01:13:49,334 - __main__ - INFO - Starting Stage 1 training (Speech-to-Text)
+2025-08-07 01:15:53,370 - stage1_trainer - INFO - Model initialized. Trainable parameters: 17305600
+2025-08-07 01:23:22,694 - stage1_trainer - ERROR - Failed to initialize wandb: module 'wandb' has no attribute 'init'
+2025-08-07 01:23:22,694 - stage1_trainer - INFO - Starting Stage 1 training...
+2025-08-07 01:23:22,695 - stage1_trainer - INFO - Total epochs: 3
+2025-08-07 01:23:22,695 - stage1_trainer - INFO - Batch size: 16
+2025-08-07 01:23:22,695 - stage1_trainer - INFO - Learning rate: 4e-06
+2025-08-07 01:23:27,699 - stage1_trainer - WARNING - Failed to log to wandb: module 'wandb' has no attribute 'log'
+2025-08-07 01:24:14,251 - stage1_trainer - WARNING - Failed to log to wandb: module 'wandb' has no attribute 'log'
+2025-08-07 01:25:00,760 - stage1_trainer - WARNING - Failed to log to wandb: module 'wandb' has no attribute 'log'
+2025-08-07 01:25:47,265 - stage1_trainer - WARNING - Failed to log to wandb: module 'wandb' has no attribute 'log'
+2025-08-07 01:26:33,458 - stage1_trainer - WARNING - Failed to log to wandb: module 'wandb' has no attribute 'log'
+2025-08-07 01:27:19,856 - stage1_trainer - WARNING - Failed to log to wandb: module 'wandb' has no attribute 'log'
+2025-08-07 01:28:06,490 - stage1_trainer - WARNING - Failed to log to wandb: module 'wandb' has no attribute 'log'
+2025-08-07 01:28:52,599 - stage1_trainer - WARNING - Failed to log to wandb: module 'wandb' has no attribute 'log'
+2025-08-07 01:29:39,243 - stage1_trainer - WARNING - Failed to log to wandb: module 'wandb' has no attribute 'log'
+2025-08-07 01:30:25,847 - stage1_trainer - WARNING - Failed to log to wandb: module 'wandb' has no attribute 'log'
+2025-08-07 01:31:19,114 - __main__ - INFO - ==================================================
+2025-08-07 01:31:19,115 - __main__ - INFO - Audio OLMo Training
+2025-08-07 01:31:19,115 - __main__ - INFO - ==================================================
+2025-08-07 01:31:19,115 - __main__ - INFO - Stage: 1
+2025-08-07 01:31:19,115 - __main__ - INFO - Output directory: ./outputs/olmo1b_whisper_large_stage1
+2025-08-07 01:31:19,115 - __main__ - INFO - Data path: /data/input/amanr/LLaMA-Omni/InstructS2S-200K/instruct_en_train.json
+2025-08-07 01:31:19,115 - __main__ - INFO - Model: allenai/OLMo-2-0425-1B-Instruct
+2025-08-07 01:31:19,115 - __main__ - INFO - Epochs: 3
+2025-08-07 01:31:19,115 - __main__ - INFO - Batch size: 16
+2025-08-07 01:31:19,115 - __main__ - INFO - Learning rate: 4e-06
+2025-08-07 01:31:19,115 - __main__ - INFO - ==================================================
+2025-08-07 01:31:19,116 - __main__ - INFO - Distributed training: 2 processes
+2025-08-07 01:31:19,116 - __main__ - INFO - Local rank: 0
+2025-08-07 01:31:19,116 - __main__ - INFO - Using 2 GPU(s)
+2025-08-07 01:31:19,470 - __main__ - INFO - Starting Stage 1 training (Speech-to-Text)
+2025-08-07 01:31:42,354 - stage1_trainer - INFO - Model initialized. Trainable parameters: 17305600
+2025-08-07 01:39:58,257 - stage1_trainer - INFO - Initialized wandb run: https://wandb.ai/allenai-team1/aolmo/runs/4tfygbnq
+2025-08-07 01:39:58,258 - stage1_trainer - INFO - Starting Stage 1 training...
+2025-08-07 01:39:58,258 - stage1_trainer - INFO - Total epochs: 3
+2025-08-07 01:39:58,258 - stage1_trainer - INFO - Batch size: 16
+2025-08-07 01:39:58,258 - stage1_trainer - INFO - Learning rate: 4e-06
+2025-08-07 01:48:04,211 - stage1_trainer - INFO - Running validation at step 12000
+2025-08-07 03:15:38,192 - stage1_trainer - INFO - Step 12000: Val Loss = 1.9129
+2025-08-07 04:33:22,735 - stage1_trainer - INFO - Running validation at step 13000
+2025-08-07 06:01:06,625 - stage1_trainer - INFO - Step 13000: Val Loss = 1.2666
+2025-08-07 07:18:31,428 - stage1_trainer - INFO - Running validation at step 14000
+2025-08-07 08:46:04,223 - stage1_trainer - INFO - Step 14000: Val Loss = 1.2444
+2025-08-07 10:03:37,813 - stage1_trainer - INFO - Running validation at step 15000
+2025-08-07 11:31:02,842 - stage1_trainer - INFO - Step 15000: Val Loss = 1.2340
+2025-08-07 12:48:32,058 - stage1_trainer - INFO - Running validation at step 16000
+2025-08-07 14:15:39,274 - stage1_trainer - INFO - Step 16000: Val Loss = 1.2273
+2025-08-07 15:33:12,850 - stage1_trainer - INFO - Running validation at step 17000
+2025-08-07 17:01:49,498 - stage1_trainer - INFO - Step 17000: Val Loss = 1.2208
+2025-08-07 18:21:06,743 - stage1_trainer - INFO - Running validation at step 18000
+2025-08-07 19:29:08,975 - __main__ - INFO - ==================================================
+2025-08-07 19:29:08,976 - __main__ - INFO - Audio OLMo Training
+2025-08-07 19:29:08,977 - __main__ - INFO - ==================================================
+2025-08-07 19:29:08,977 - __main__ - INFO - Stage: 1
+2025-08-07 19:29:08,978 - __main__ - INFO - Output directory: ./outputs/olmo1b_whisper_large_stage1-run3
+2025-08-07 19:29:08,978 - __main__ - INFO - Data path: /data/input/amanr/LLaMA-Omni/InstructS2S-200K/instruct_en_train.json
+2025-08-07 19:29:08,979 - __main__ - INFO - Model: allenai/OLMo-2-0425-1B-Instruct
+2025-08-07 19:29:08,979 - __main__ - INFO - Epochs: 2
+2025-08-07 19:29:08,980 - __main__ - INFO - Batch size: 32
+2025-08-07 19:29:08,980 - __main__ - INFO - Learning rate: 4e-06
+2025-08-07 19:29:08,981 - __main__ - INFO - ==================================================
+2025-08-07 19:29:08,982 - __main__ - INFO - Distributed training: 2 processes
+2025-08-07 19:29:08,982 - __main__ - INFO - Local rank: 0
+2025-08-07 19:29:08,983 - __main__ - INFO - Using 2 GPU(s)
+2025-08-07 19:33:18,816 - __main__ - INFO - Starting Stage 1 training (Speech-to-Text)
+2025-08-07 19:35:48,082 - __main__ - ERROR - Training failed with error: CUDA error: no kernel image is available for execution on the device
+CUDA kernel errors might be asynchronously reported at some other API call, so the stacktrace below might be incorrect.
+For debugging consider passing CUDA_LAUNCH_BLOCKING=1.
+Compile with `TORCH_USE_CUDA_DSA` to enable device-side assertions.
+
+2025-08-07 19:35:48,085 - __main__ - ERROR - Traceback (most recent call last):
+  File "/data/input/amanr/LLaMA-Omni/training/train.py", line 186, in main
+    trainer = Stage1Trainer(
+  File "/data/input/amanr/LLaMA-Omni/training/stage1_trainer.py", line 45, in __init__
+    self.setup_model(model_path)
+  File "/data/input/amanr/LLaMA-Omni/training/stage1_trainer.py", line 114, in setup_model
+    self.model = DDP(
+  File "/root/.conda/envs/au/lib/python3.10/site-packages/torch/nn/parallel/distributed.py", line 800, in __init__
+    _sync_module_states(
+  File "/root/.conda/envs/au/lib/python3.10/site-packages/torch/distributed/utils.py", line 298, in _sync_module_states
+    _sync_params_and_buffers(process_group, module_states, broadcast_bucket_size, src)
+  File "/root/.conda/envs/au/lib/python3.10/site-packages/torch/distributed/utils.py", line 309, in _sync_params_and_buffers
+    dist._broadcast_coalesced(
+RuntimeError: CUDA error: no kernel image is available for execution on the device
+CUDA kernel errors might be asynchronously reported at some other API call, so the stacktrace below might be incorrect.
+For debugging consider passing CUDA_LAUNCH_BLOCKING=1.
+Compile with `TORCH_USE_CUDA_DSA` to enable device-side assertions.
+
+
+2025-08-07 19:49:32,561 - stage1_trainer - INFO - Step 18000: Val Loss = 1.2177
+2025-08-07 20:48:50,897 - __main__ - INFO - ==================================================
+2025-08-07 20:48:50,897 - __main__ - INFO - Audio OLMo Training
+2025-08-07 20:48:50,898 - __main__ - INFO - ==================================================
+2025-08-07 20:48:50,898 - __main__ - INFO - Stage: 1
+2025-08-07 20:48:50,898 - __main__ - INFO - Output directory: ./outputs/olmo1b_whisper_large_stage1-run3
+2025-08-07 20:48:50,899 - __main__ - INFO - Data path: /data/input/amanr/LLaMA-Omni/InstructS2S-200K/instruct_en_train.json
+2025-08-07 20:48:50,899 - __main__ - INFO - Model: allenai/OLMo-2-0425-1B-Instruct
+2025-08-07 20:48:50,899 - __main__ - INFO - Epochs: 2
+2025-08-07 20:48:50,900 - __main__ - INFO - Batch size: 32
+2025-08-07 20:48:50,900 - __main__ - INFO - Learning rate: 4e-06
+2025-08-07 20:48:50,900 - __main__ - INFO - ==================================================
+2025-08-07 20:48:50,901 - __main__ - INFO - Distributed training: 2 processes
+2025-08-07 20:48:50,901 - __main__ - INFO - Local rank: 0
+2025-08-07 20:48:50,902 - __main__ - INFO - Using 2 GPU(s)
+2025-08-07 20:48:51,648 - __main__ - INFO - Starting Stage 1 training (Speech-to-Text)
+2025-08-07 20:51:42,428 - stage1_trainer - INFO - Model initialized. Trainable parameters: 17305600
+2025-08-07 20:54:35,333 - stage1_trainer - ERROR - Failed to initialize wandb: module 'wandb' has no attribute 'init'
+2025-08-07 20:54:35,334 - stage1_trainer - INFO - Starting Stage 1 training...
+2025-08-07 20:54:35,335 - stage1_trainer - INFO - Total epochs: 2
+2025-08-07 20:54:35,335 - stage1_trainer - INFO - Batch size: 32
+2025-08-07 20:54:35,336 - stage1_trainer - INFO - Learning rate: 4e-06
+2025-08-07 20:54:41,854 - stage1_trainer - WARNING - Failed to log to wandb: module 'wandb' has no attribute 'log'
+2025-08-07 20:55:40,708 - stage1_trainer - WARNING - Failed to log to wandb: module 'wandb' has no attribute 'log'
+2025-08-07 21:04:56,414 - __main__ - INFO - ==================================================
+2025-08-07 21:04:56,415 - __main__ - INFO - Audio OLMo Training
+2025-08-07 21:04:56,415 - __main__ - INFO - ==================================================
+2025-08-07 21:04:56,415 - __main__ - INFO - Stage: 1
+2025-08-07 21:04:56,415 - __main__ - INFO - Output directory: ./outputs/olmo1b_whisper_large_stage1-run3
+2025-08-07 21:04:56,415 - __main__ - INFO - Data path: /data/input/amanr/LLaMA-Omni/InstructS2S-200K/instruct_en_train.json
+2025-08-07 21:04:56,416 - __main__ - INFO - Model: allenai/OLMo-2-0425-1B-Instruct
+2025-08-07 21:04:56,416 - __main__ - INFO - Epochs: 1
+2025-08-07 21:04:56,416 - __main__ - INFO - Batch size: 32
+2025-08-07 21:04:56,416 - __main__ - INFO - Learning rate: 4e-06
+2025-08-07 21:04:56,416 - __main__ - INFO - ==================================================
+2025-08-07 21:04:56,416 - __main__ - INFO - Distributed training: 2 processes
+2025-08-07 21:04:56,416 - __main__ - INFO - Local rank: 0
+2025-08-07 21:04:56,417 - __main__ - INFO - Using 2 GPU(s)
+2025-08-07 21:04:57,145 - __main__ - INFO - Starting Stage 1 training (Speech-to-Text)
+2025-08-07 21:05:20,466 - stage1_trainer - INFO - Model initialized. Trainable parameters: 17305600
+2025-08-07 21:06:59,811 - stage1_trainer - INFO - Running validation at step 19000
+2025-08-07 21:07:33,600 - stage1_trainer - INFO - Initialized wandb run: https://wandb.ai/allenai-team1/aolmo/runs/l952o132
+2025-08-07 21:07:33,601 - stage1_trainer - INFO - Starting Stage 1 training...
+2025-08-07 21:07:33,602 - stage1_trainer - INFO - Total epochs: 1
+2025-08-07 21:07:33,602 - stage1_trainer - INFO - Batch size: 32
+2025-08-07 21:07:33,602 - stage1_trainer - INFO - Learning rate: 4e-06
+2025-08-07 21:07:51,062 - stage1_trainer - INFO - Saving checkpoint at step 5950
+2025-08-07 21:08:00,256 - stage1_trainer - INFO - Model saved in safetensors format to ./outputs/olmo1b_whisper_large_stage1-run3/checkpoint-step-5950
+2025-08-07 21:08:57,541 - stage1_trainer - INFO - Saving checkpoint at step 5960
+2025-08-07 21:09:07,605 - stage1_trainer - INFO - Model saved in safetensors format to ./outputs/olmo1b_whisper_large_stage1-run3/checkpoint-step-5960
+2025-08-07 21:10:04,524 - stage1_trainer - INFO - Saving checkpoint at step 5970
+2025-08-07 21:10:14,152 - stage1_trainer - INFO - Model saved in safetensors format to ./outputs/olmo1b_whisper_large_stage1-run3/checkpoint-step-5970
+2025-08-07 21:11:10,824 - __main__ - INFO - ==================================================
+2025-08-07 21:11:10,825 - __main__ - INFO - Audio OLMo Training
+2025-08-07 21:11:10,826 - __main__ - INFO - ==================================================
+2025-08-07 21:11:10,827 - __main__ - INFO - Stage: 1
+2025-08-07 21:11:10,827 - __main__ - INFO - Output directory: ./outputs/olmo1b_whisper_large_stage1-run3
+2025-08-07 21:11:10,828 - __main__ - INFO - Data path: /data/input/amanr/LLaMA-Omni/InstructS2S-200K/instruct_en_train.json
+2025-08-07 21:11:10,828 - __main__ - INFO - Model: allenai/OLMo-2-0425-1B-Instruct
+2025-08-07 21:11:10,829 - __main__ - INFO - Epochs: 1
+2025-08-07 21:11:10,830 - __main__ - INFO - Batch size: 32
+2025-08-07 21:11:10,830 - __main__ - INFO - Learning rate: 4e-06
+2025-08-07 21:11:10,831 - __main__ - INFO - ==================================================
+2025-08-07 21:11:10,831 - __main__ - INFO - Distributed training: 2 processes
+2025-08-07 21:11:10,832 - __main__ - INFO - Local rank: 0
+2025-08-07 21:11:10,832 - __main__ - INFO - Using 2 GPU(s)
+2025-08-07 21:11:11,621 - __main__ - INFO - Starting Stage 1 training (Speech-to-Text)
+2025-08-07 21:11:34,132 - stage1_trainer - INFO - Model initialized. Trainable parameters: 17305600
+2025-08-07 21:14:04,386 - stage1_trainer - INFO - Initialized wandb run: https://wandb.ai/allenai-team1/aolmo/runs/uelubhun
+2025-08-07 21:14:04,387 - stage1_trainer - INFO - Starting Stage 1 training...
+2025-08-07 21:14:04,387 - stage1_trainer - INFO - Total epochs: 1
+2025-08-07 21:14:04,388 - stage1_trainer - INFO - Batch size: 32
+2025-08-07 21:14:04,388 - stage1_trainer - INFO - Learning rate: 4e-06
+2025-08-07 21:19:16,315 - stage1_trainer - INFO - Saving checkpoint at step 6000
+2025-08-07 21:19:26,486 - stage1_trainer - INFO - Model saved in safetensors format to ./outputs/olmo1b_whisper_large_stage1-run3/checkpoint-step-6000
+2025-08-07 21:19:26,690 - stage1_trainer - INFO - Running validation at step 6000
+2025-08-07 21:28:06,791 - __main__ - INFO - ==================================================
+2025-08-07 21:28:06,795 - __main__ - INFO - Audio OLMo Training
+2025-08-07 21:28:06,795 - __main__ - INFO - ==================================================
+2025-08-07 21:28:06,796 - __main__ - INFO - Stage: 1
+2025-08-07 21:28:06,796 - __main__ - INFO - Output directory: ./outputs/olmo1b_whisper_large_stage1-run3
+2025-08-07 21:28:06,796 - __main__ - INFO - Data path: /data/input/amanr/LLaMA-Omni/InstructS2S-200K/instruct_en_train.json
+2025-08-07 21:28:06,796 - __main__ - INFO - Model: allenai/OLMo-2-0425-1B-Instruct
+2025-08-07 21:28:06,796 - __main__ - INFO - Epochs: 1
+2025-08-07 21:28:06,797 - __main__ - INFO - Batch size: 32
+2025-08-07 21:28:06,797 - __main__ - INFO - Learning rate: 1.6e-05
+2025-08-07 21:28:06,797 - __main__ - INFO - ==================================================
+2025-08-07 21:28:06,797 - __main__ - INFO - Distributed training: 2 processes
+2025-08-07 21:28:06,797 - __main__ - INFO - Local rank: 0
+2025-08-07 21:28:06,798 - __main__ - INFO - Using 2 GPU(s)
+2025-08-07 21:28:07,550 - __main__ - INFO - Starting Stage 1 training (Speech-to-Text)
+2025-08-07 21:28:30,752 - stage1_trainer - INFO - Model initialized. Trainable parameters: 17305600
+2025-08-07 21:31:03,261 - stage1_trainer - INFO - Initialized wandb run: https://wandb.ai/allenai-team1/aolmo/runs/p45uu8kf
+2025-08-07 21:31:03,261 - stage1_trainer - INFO - Starting Stage 1 training...
+2025-08-07 21:31:03,262 - stage1_trainer - INFO - Total epochs: 1
+2025-08-07 21:31:03,262 - stage1_trainer - INFO - Batch size: 32
+2025-08-07 21:31:03,262 - stage1_trainer - INFO - Learning rate: 1.6e-05
+2025-08-07 21:36:10,274 - stage1_trainer - INFO - Saving checkpoint at step 6000
+2025-08-07 21:36:19,373 - stage1_trainer - INFO - Model saved in safetensors format to ./outputs/olmo1b_whisper_large_stage1-run3/checkpoint-step-6000
+2025-08-07 21:36:19,558 - stage1_trainer - INFO - Running validation at step 6000
+2025-08-07 21:39:20,317 - __main__ - INFO - ==================================================
+2025-08-07 21:39:20,319 - __main__ - INFO - Audio OLMo Training
+2025-08-07 21:39:20,319 - __main__ - INFO - ==================================================
+2025-08-07 21:39:20,320 - __main__ - INFO - Stage: 1
+2025-08-07 21:39:20,320 - __main__ - INFO - Output directory: ./outputs/olmo1b_whisper_large_stage1-run3
+2025-08-07 21:39:20,320 - __main__ - INFO - Data path: /data/input/amanr/LLaMA-Omni/InstructS2S-200K/instruct_en_train.json
+2025-08-07 21:39:20,320 - __main__ - INFO - Model: allenai/OLMo-2-0425-1B-Instruct
+2025-08-07 21:39:20,321 - __main__ - INFO - Epochs: 1
+2025-08-07 21:39:20,321 - __main__ - INFO - Batch size: 32
+2025-08-07 21:39:20,321 - __main__ - INFO - Learning rate: 1.6e-05
+2025-08-07 21:39:20,322 - __main__ - INFO - ==================================================
+2025-08-07 21:39:20,322 - __main__ - INFO - Distributed training: 2 processes
+2025-08-07 21:39:20,322 - __main__ - INFO - Local rank: 0
+2025-08-07 21:39:20,322 - __main__ - INFO - Using 2 GPU(s)
+2025-08-07 21:39:21,101 - __main__ - INFO - Starting Stage 1 training (Speech-to-Text)
+2025-08-07 21:39:42,549 - stage1_trainer - INFO - Model initialized. Trainable parameters: 17305600
+2025-08-07 21:42:11,875 - stage1_trainer - INFO - Initialized wandb run: https://wandb.ai/allenai-team1/aolmo/runs/mxnbvyrh
+2025-08-07 21:42:11,875 - stage1_trainer - INFO - Starting Stage 1 training...
+2025-08-07 21:42:11,876 - stage1_trainer - INFO - Total epochs: 1
+2025-08-07 21:42:11,876 - stage1_trainer - INFO - Batch size: 32
+2025-08-07 21:42:11,876 - stage1_trainer - INFO - Learning rate: 1.6e-05
+2025-08-07 21:47:18,729 - stage1_trainer - INFO - Saving checkpoint at step 6000
+2025-08-07 21:47:28,361 - stage1_trainer - INFO - Model saved in safetensors format to ./outputs/olmo1b_whisper_large_stage1-run3/checkpoint-step-6000
+2025-08-07 22:33:54,741 - stage1_trainer - INFO - Step 19000: Val Loss = 1.2152
+2025-08-07 23:24:32,170 - stage1_trainer - INFO - Saving checkpoint at step 7000
+2025-08-07 23:24:42,548 - stage1_trainer - INFO - Model saved in safetensors format to ./outputs/olmo1b_whisper_large_stage1-run3/checkpoint-step-7000
+2025-08-07 23:51:42,106 - stage1_trainer - INFO - Running validation at step 20000
+2025-08-08 00:08:06,773 - __main__ - INFO - ==================================================
+2025-08-08 00:08:06,774 - __main__ - INFO - Audio OLMo Training
+2025-08-08 00:08:06,774 - __main__ - INFO - ==================================================
+2025-08-08 00:08:06,774 - __main__ - INFO - Stage: 1
+2025-08-08 00:08:06,775 - __main__ - INFO - Output directory: ./outputs/olmo1b_whisper_large_stage1-run3
+2025-08-08 00:08:06,776 - __main__ - INFO - Data path: /data/input/amanr/LLaMA-Omni/InstructS2S-200K/instruct_en_train.json
+2025-08-08 00:08:06,777 - __main__ - INFO - Model: allenai/OLMo-2-0425-1B-Instruct
+2025-08-08 00:08:06,778 - __main__ - INFO - Epochs: 3
+2025-08-08 00:08:06,779 - __main__ - INFO - Batch size: 32
+2025-08-08 00:08:06,779 - __main__ - INFO - Learning rate: 1.2891e-05
+2025-08-08 00:08:06,781 - __main__ - INFO - ==================================================
+2025-08-08 00:08:06,781 - __main__ - INFO - Distributed training: 2 processes
+2025-08-08 00:08:06,782 - __main__ - INFO - Local rank: 0
+2025-08-08 00:08:06,783 - __main__ - INFO - Using 2 GPU(s)
+2025-08-08 00:08:07,510 - __main__ - INFO - Starting Stage 1 training (Speech-to-Text)
+2025-08-08 00:08:10,723 - __main__ - ERROR - Training failed with error: [Errno 2] No such file or directory: './outputs/olmo1b_whisper_large_stage1-run3/checkpoint-step-7000/speech_projector.bin'
+2025-08-08 00:08:10,725 - __main__ - ERROR - Traceback (most recent call last):
+  File "/data/input/amanr/LLaMA-Omni/training/train.py", line 186, in main
+    trainer = Stage1Trainer(
+  File "/data/input/amanr/LLaMA-Omni/training/stage1_trainer.py", line 45, in __init__
+    self.setup_model(model_path)
+  File "/data/input/amanr/LLaMA-Omni/training/stage1_trainer.py", line 73, in setup_model
+    self.tokenizer, self.model, _ = load_pretrained_model(
+  File "/data/input/amanr/LLaMA-Omni/olmo_omni/model/builder.py", line 113, in load_pretrained_model
+    speech_projector_weights = torch.load(
+  File "/root/.conda/envs/a/lib/python3.10/site-packages/torch/serialization.py", line 997, in load
+    with _open_file_like(f, 'rb') as opened_file:
+  File "/root/.conda/envs/a/lib/python3.10/site-packages/torch/serialization.py", line 444, in _open_file_like
+    return _open_file(name_or_buffer, mode)
+  File "/root/.conda/envs/a/lib/python3.10/site-packages/torch/serialization.py", line 425, in __init__
+    super().__init__(open(name, mode))
+FileNotFoundError: [Errno 2] No such file or directory: './outputs/olmo1b_whisper_large_stage1-run3/checkpoint-step-7000/speech_projector.bin'
+
+2025-08-08 00:14:57,378 - __main__ - INFO - ==================================================
+2025-08-08 00:14:57,379 - __main__ - INFO - Audio OLMo Training
+2025-08-08 00:14:57,381 - __main__ - INFO - ==================================================
+2025-08-08 00:14:57,381 - __main__ - INFO - Stage: 1
+2025-08-08 00:14:57,383 - __main__ - INFO - Output directory: ./outputs/olmo7b_whisper_large_stage1-run1
+2025-08-08 00:14:57,383 - __main__ - INFO - Data path: /data/input/amanr/LLaMA-Omni/InstructS2S-200K/instruct_en_train.json
+2025-08-08 00:14:57,385 - __main__ - INFO - Model: allenai/OLMo-2-1124-7B-Instruct
+2025-08-08 00:14:57,386 - __main__ - INFO - Epochs: 3
+2025-08-08 00:14:57,386 - __main__ - INFO - Batch size: 32
+2025-08-08 00:14:57,388 - __main__ - INFO - Learning rate: 1.6e-05
+2025-08-08 00:14:57,389 - __main__ - INFO - ==================================================
+2025-08-08 00:14:57,389 - __main__ - INFO - Distributed training: 2 processes
+2025-08-08 00:14:57,390 - __main__ - INFO - Local rank: 0
+2025-08-08 00:14:57,392 - __main__ - INFO - Using 2 GPU(s)
+2025-08-08 00:14:58,201 - __main__ - INFO - Starting Stage 1 training (Speech-to-Text)
+2025-08-08 00:15:53,399 - stage1_trainer - INFO - Model initialized. Trainable parameters: 21501952
+2025-08-08 00:19:03,636 - __main__ - INFO - ==================================================
+2025-08-08 00:19:03,637 - __main__ - INFO - Audio OLMo Training
+2025-08-08 00:19:03,637 - __main__ - INFO - ==================================================
+2025-08-08 00:19:03,639 - __main__ - INFO - Stage: 1
+2025-08-08 00:19:03,639 - __main__ - INFO - Output directory: ./outputs/olmo1b_whisper_large_stage1-run4
+2025-08-08 00:19:03,640 - __main__ - INFO - Data path: /data/input/amanr/LLaMA-Omni/InstructS2S-200K/instruct_en_train.json
+2025-08-08 00:19:03,640 - __main__ - INFO - Model: allenai/OLMo-2-0425-1B-Instruct
+2025-08-08 00:19:03,641 - __main__ - INFO - Epochs: 3
+2025-08-08 00:19:03,641 - __main__ - INFO - Batch size: 32
+2025-08-08 00:19:03,642 - __main__ - INFO - Learning rate: 1.6e-05
+2025-08-08 00:19:03,643 - __main__ - INFO - ==================================================
+2025-08-08 00:19:03,643 - __main__ - INFO - Distributed training: 2 processes
+2025-08-08 00:19:03,643 - __main__ - INFO - Local rank: 0
+2025-08-08 00:19:03,644 - __main__ - INFO - Using 2 GPU(s)
+2025-08-08 00:19:04,411 - __main__ - INFO - Starting Stage 1 training (Speech-to-Text)
+2025-08-08 00:19:27,599 - stage1_trainer - INFO - Model initialized. Trainable parameters: 17305600
+2025-08-08 00:23:57,156 - __main__ - INFO - ==================================================
+2025-08-08 00:23:57,157 - __main__ - INFO - Audio OLMo Training
+2025-08-08 00:23:57,157 - __main__ - INFO - ==================================================
+2025-08-08 00:23:57,157 - __main__ - INFO - Stage: 1
+2025-08-08 00:23:57,158 - __main__ - INFO - Output directory: ./outputs/olmo1b_whisper_large_stage1-run4
+2025-08-08 00:23:57,158 - __main__ - INFO - Data path: /data/input/amanr/LLaMA-Omni/InstructS2S-200K/instruct_en_train.json
+2025-08-08 00:23:57,158 - __main__ - INFO - Model: allenai/OLMo-2-0425-1B-Instruct
+2025-08-08 00:23:57,159 - __main__ - INFO - Epochs: 3
+2025-08-08 00:23:57,159 - __main__ - INFO - Batch size: 32
+2025-08-08 00:23:57,159 - __main__ - INFO - Learning rate: 1e-05
+2025-08-08 00:23:57,160 - __main__ - INFO - ==================================================
+2025-08-08 00:23:57,160 - __main__ - INFO - Distributed training: 2 processes
+2025-08-08 00:23:57,161 - __main__ - INFO - Local rank: 0
+2025-08-08 00:23:57,161 - __main__ - INFO - Using 2 GPU(s)
+2025-08-08 00:23:57,897 - __main__ - INFO - Starting Stage 1 training (Speech-to-Text)
+2025-08-08 00:24:23,650 - stage1_trainer - INFO - Model initialized. Trainable parameters: 17305600
+2025-08-08 00:30:37,830 - stage1_trainer - INFO - Initialized wandb run: https://wandb.ai/allenai-team1/aolmo/runs/146momdj
+2025-08-08 00:30:37,831 - stage1_trainer - INFO - Starting Stage 1 training...
+2025-08-08 00:30:37,832 - stage1_trainer - INFO - Total epochs: 3
+2025-08-08 00:30:37,832 - stage1_trainer - INFO - Batch size: 32
+2025-08-08 00:30:37,834 - stage1_trainer - INFO - Learning rate: 1e-05
+2025-08-08 00:35:56,340 - stage1_trainer - INFO - Saving checkpoint at step 6000
+2025-08-08 00:36:06,308 - stage1_trainer - INFO - Model saved in safetensors format to ./outputs/olmo1b_whisper_large_stage1-run4/checkpoint-step-6000
+2025-08-08 02:15:09,938 - stage1_trainer - INFO - Saving checkpoint at step 7000
+2025-08-08 02:15:20,769 - stage1_trainer - INFO - Model saved in safetensors format to ./outputs/olmo1b_whisper_large_stage1-run4/checkpoint-step-7000
+2025-08-08 03:04:39,887 - stage1_trainer - INFO - Running validation at step 7500
+2025-08-08 03:58:01,917 - stage1_trainer - INFO - Step 7500: Val Loss = 1.2331
+2025-08-08 04:47:13,538 - stage1_trainer - INFO - Saving checkpoint at step 8000
+2025-08-08 04:47:24,580 - stage1_trainer - INFO - Model saved in safetensors format to ./outputs/olmo1b_whisper_large_stage1-run4/checkpoint-step-8000
+2025-08-08 06:25:53,566 - stage1_trainer - INFO - Saving checkpoint at step 9000
+2025-08-08 06:26:03,883 - stage1_trainer - INFO - Model saved in safetensors format to ./outputs/olmo1b_whisper_large_stage1-run4/checkpoint-step-9000
+2025-08-08 08:05:19,921 - stage1_trainer - INFO - Saving checkpoint at step 10000
+2025-08-08 08:05:30,624 - stage1_trainer - INFO - Model saved in safetensors format to ./outputs/olmo1b_whisper_large_stage1-run4/checkpoint-step-10000
+2025-08-08 08:05:30,836 - stage1_trainer - INFO - Running validation at step 10000
+2025-08-08 09:00:16,370 - stage1_trainer - INFO - Step 10000: Val Loss = 1.2064
+2025-08-08 10:39:03,858 - stage1_trainer - INFO - Saving checkpoint at step 11000
+2025-08-08 10:39:12,656 - stage1_trainer - INFO - Model saved in safetensors format to ./outputs/olmo1b_whisper_large_stage1-run4/checkpoint-step-11000
+2025-08-08 13:01:10,417 - stage1_trainer - INFO - Epoch 1: Train Loss = 1.2401
+2025-08-08 13:01:10,417 - stage1_trainer - INFO - Epoch 1: Val Loss = 1.1965
+2025-08-08 13:01:24,489 - stage1_trainer - INFO - Model saved in safetensors format to ./outputs/olmo1b_whisper_large_stage1-run4/checkpoint-epoch-1
+2025-08-08 13:01:24,888 - stage1_trainer - INFO - Checkpoint saved to ./outputs/olmo1b_whisper_large_stage1-run4/checkpoint-epoch-1
+2025-08-08 13:01:24,889 - stage1_trainer - INFO - New best model saved with val_loss: 1.1965
+2025-08-08 13:12:57,104 - stage1_trainer - INFO - Saving checkpoint at step 12000
+2025-08-08 13:13:07,061 - stage1_trainer - INFO - Model saved in safetensors format to ./outputs/olmo1b_whisper_large_stage1-run4/checkpoint-step-12000
+2025-08-08 14:03:07,306 - stage1_trainer - INFO - Running validation at step 12500
+2025-08-08 14:56:35,230 - stage1_trainer - INFO - Step 12500: Val Loss = 1.1943
+2025-08-08 15:46:36,673 - stage1_trainer - INFO - Saving checkpoint at step 13000
+2025-08-08 15:46:46,145 - stage1_trainer - INFO - Model saved in safetensors format to ./outputs/olmo1b_whisper_large_stage1-run4/checkpoint-step-13000
